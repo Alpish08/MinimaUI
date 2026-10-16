@@ -22,4 +22,4 @@ No -
 * And many more yet to come!
 
 # Disclaimer
-* Artificial Intelligence was used in the making of this frontend. I am not familiar with Android Studio, but since Kotlin (coding language used for this app) is similar to Java, which I have experience with, I optimize the code to the best of my abilities. UI design was 100% done by me, no AI was used for assets.
+* Artificial Intelligence was used in the making of this frontend. I am not familiar with Android Studio, so Claude Code does the backend for me. However, since Kotlin (coding language used for this app) is similar to Java, which I have experience with, I optimize the code to the best of my abilities. UI design was 100% done by me, no AI was used for assets.
