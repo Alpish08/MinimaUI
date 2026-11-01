@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The artwork as supplied, as large as it can be while the wordmark's two end points stay inside a
+     circular launcher mask (72dp across, centred in the 108dp icon). -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/ic_launcher_art"
+    android:inset="9dp" />

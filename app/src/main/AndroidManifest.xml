@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Lets backups live in MinimaUI/Backup on internal storage and survive reinstalling. -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+
+    <!-- A weak tick when changing pages or platforms. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- Lets MinimaUI see the emulators it launches. -->
+    <queries>
+        <package android:name="org.benjisc.android" />
+        <package android:name="io.github.borked3ds.android" />
+        <package android:name="info.cemu.cemu.debug" />
+        <package android:name="org.gamerytb.citra.canary" />
+        <package android:name="org.citron.citron_emu" />
+        <package android:name="org.citron.citron_emu.ea" />
+        <package android:name="com.antutu.ABenchMark" />
+        <package android:name="com.miHoYo.Yuanshen" />
+        <package android:name="org.cytrus.cytrus_emu" />
+        <package android:name="dev.lemon.lemon_emulator" />
+        <package android:name="com.andromeda.androbench2" />
+        <package android:name="org.sudachi.sudachi_emu" />
+        <package android:name="org.sudachi.sudachi_emu.ea" />
+        <package android:name="com.sumi.SumiEmulator" />
+        <package android:name="org.suyu.suyu_emu" />
+        <package android:name="dev.suyu.suyu_emu.relWithDebInfo" />
+        <package android:name="dev.suyu.suyu_emu" />
+        <package android:name="org.uzuy.uzuy_emu" />
+        <package android:name="org.uzuy.uzuy_emu.ea" />
+        <package android:name="org.uzuy.uzuy_emu.mmjr" />
+        <package android:name="com.antutu.ABenchMark.ea" />
+        <package android:name="org.yuzu.yuzu_emu" />
+        <package android:name="org.yuzu.yuzu_emu.ea" />
+        <package android:name="org.Ziunx.Ziunx_emu.ea" />
+        <package android:name="org.vita3kplus.emulator" />
+        <package android:name="org.vita3k.emulator.ikhoeyZX" />
+        <package android:name="org.ppsspp.ppsspp" />
+        <package android:name="org.ppsspp.ppssppgold" />
+        <package android:name="xyz.aethersx2.android" />
+        <package android:name="xyz.nethersx2.android" />
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <package android:name="dev.eden.eden_emulator" />
+        <package android:name="io.github.azahar_emu.azahar" />
+        <package android:name="info.cemu.cemu" />
+        <package android:name="org.vita3k.emulator" />
+    </queries>
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.MinimaUI">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.MinimaUI"
+            android:screenOrientation="landscape"
+            android:resizeableActivity="false"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustNothing">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+                <!-- MinimaUI is meant to be the home app. -->
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Lets other apps (Winlator Cmod, GameHub) pin game shortcuts to MinimaUI. -->
+        <activity
+            android:name=".PinShortcutActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.content.pm.action.CONFIRM_PIN_SHORTCUT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Old-style shortcut installs (some apps, e.g. GameHub, still send this broadcast). -->
+        <receiver
+            android:name=".LegacyShortcutReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.android.launcher.action.INSTALL_SHORTCUT" />
+            </intent-filter>
+        </receiver>
+        <!-- Optional: the volume / brightness bars over other apps (enable in Accessibility settings). -->
+        <service
+            android:name=".overlay.LevelOverlayService"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/level_overlay_service" />
+        </service>
+    </application>
+
+</manifest>

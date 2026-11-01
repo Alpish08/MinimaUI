@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A solid square die, the same size as before (its outline reached 2..22): the five pips are holes. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M6.5,2 L17.5,2 A4.5,4.5 0 0 1 22,6.5 L22,17.5 A4.5,4.5 0 0 1 17.5,22 L6.5,22 A4.5,4.5 0 0 1 2,17.5 L2,6.5 A4.5,4.5 0 0 1 6.5,2 Z M8,6.6 a1.6,1.6 0 1 0 0.01,0 Z M16,6.6 a1.6,1.6 0 1 0 0.01,0 Z M12,10.5 a1.6,1.6 0 1 0 0.01,0 Z M8,14.4 a1.6,1.6 0 1 0 0.01,0 Z M16,14.4 a1.6,1.6 0 1 0 0.01,0 Z" />
+</vector>

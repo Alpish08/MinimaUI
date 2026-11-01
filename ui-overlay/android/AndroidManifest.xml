@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.minimaui.overlay.android">
+    <!-- MinimaUI's fading outline for Android's toast frame. Enabled and put on top by the module's service.sh. -->
+    <overlay android:targetPackage="android" android:priority="1" android:isStatic="false" />
+    <application android:hasCode="false" android:label="MinimaUI toast outline" />
+</manifest>

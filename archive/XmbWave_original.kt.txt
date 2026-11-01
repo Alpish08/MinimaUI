@@ -1,0 +1,91 @@
+package com.minimaui.app.ui.components
+
+import android.graphics.RuntimeShader
+import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.delay
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.ShaderBrush
+
+/** Draws the XMB wave behind the All Games page (and, blurred and dimmer, the Apps page). This is the master switch; Customize has the one the user flips. */
+const val XmbWaveEnabled = true
+
+/** The wave is redrawn this many times a second (it moves slowly, so 30 is smooth and a quarter of the cost of 120). */
+private const val WaveFps = 30
+
+/** The ribbon (0..3) drawn in MinimaUI's red instead of white. */
+private const val RedLine = 1
+
+// Four slow, overlapping ribbons: each is a thin bright line with a soft glow and a faint fill under it, in white on black
+// (one of them in MinimaUI's red). The output is premultiplied, so it only ever lightens the black (the OLED stays off where
+// there is no wave). Half a step of noise is added to the alpha so the very faint gradients don't band.
+private val WaveAgsl = """
+uniform float2 size;
+uniform float time;
+uniform float soft;
+uniform float gain;
+
+half4 main(float2 p) {
+    float2 uv = p / size;
+    if (uv.y < 0.19) return half4(0.0);                 // above the highest ribbon's glow
+    float px = size.y / 1080.0;
+    float aw = 0.0;
+    float ar = 0.0;
+    for (int i = 0; i < 4; i++) {
+        float fi = float(i);
+        float y = 0.66 + (fi - 1.5) * 0.045
+            + 0.085 * sin(uv.x * 3.1 + time * 0.23 + fi * 1.3)
+            + 0.045 * sin(uv.x * 5.7 - time * 0.17 + fi * 2.1)
+            + 0.020 * sin(uv.x * 11.0 + time * 0.31 + fi * 0.7);
+        float d = (uv.y - y) * size.y;                  // px below the ribbon's line
+        float sl = 2.2 * soft;                          // soft > 1 blurs the line: wider, and dimmer to keep its energy
+        float line = exp(-(d * d) / (2.0 * sl * sl * px * px)) / soft;
+        float glow = exp(-abs(d) / (26.0 * sqrt(soft) * px));
+        float under = smoothstep(0.0, 40.0 * px, d) * (1.0 - smoothstep(40.0 * px, 260.0 * px, d));
+        float a = (line * 0.55 + glow * 0.07 + under * 0.045) / (1.0 + fi * 0.35);
+        if (i == ${RedLine}) { ar += a; } else { aw += a; }
+    }
+    float edge = smoothstep(0.0, 0.18, uv.x) * (1.0 - smoothstep(0.82, 1.0, uv.x));
+    float k = edge * 0.62 * gain;
+    aw *= k;
+    ar *= k;
+    float t = aw + ar;
+    if (t > 0.5) { aw *= 0.5 / t; ar *= 0.5 / t; t = 0.5; }
+    float n = fract(52.9829189 * fract(dot(p, float2(0.06711056, 0.00583715))));
+    float tn = max(t + (n - 0.5) / 255.0, 0.0);
+    float3 rgb = t > 0.0001 ? (float3(aw) + ar * float3(1.0, 0.227, 0.227)) * (tn / t) : float3(tn);
+    return half4(half3(rgb), half(tn));
+}
+"""
+
+/** [soft] blurs the ribbons (1 = as drawn on All Games, 3 = a slight blur) and [brightness] scales them (1 = full). */
+@Composable
+fun XmbWave(enabled: Boolean, modifier: Modifier = Modifier, soft: Float = 1f, brightness: Float = 1f) {
+    if (!XmbWaveEnabled || !enabled) return
+    val shader = remember { RuntimeShader(WaveAgsl) }
+    var time by remember { mutableFloatStateOf(0f) }
+    // Only the draw reads [time], so nothing recomposes. The frame clock stops by itself while the app is in the background.
+    LaunchedEffect(Unit) {
+        while (true) {
+            withFrameNanos { now -> time = now / 1e9f }
+            // Sleeping between frames (rather than skipping them) lets the app idle: it wakes WaveFps times a second, not on every vsync.
+            delay(1000L / WaveFps - 4L)
+        }
+    }
+    Box(
+        modifier.drawBehind {
+            shader.setFloatUniform("size", size.width, size.height)
+            shader.setFloatUniform("time", time % 6283f)
+            shader.setFloatUniform("soft", soft.coerceAtLeast(1f))
+            shader.setFloatUniform("gain", brightness)
+            drawRect(ShaderBrush(shader))
+        }
+    )
+}

@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">MinimaUI</string>
+    <string name="level_overlay_description">Shows the volume and brightness bars over games and apps when the system changes them.</string>
+    <string name="error_rom_folder">Couldn\'t add that folder. Please choose a subfolder.</string>
+    <string name="backup_needs_access">Allow \"All files access\" for MinimaUI, then try the backup again.</string>
+    <string name="backup_saved">Backup saved: %1$s</string>
+    <string name="backup_failed">Couldn\'t save the backup.</string>
+    <string name="restore_done">Settings restored.</string>
+    <string name="wave_saved">Custom wave saved: %1$s</string>
+    <string name="wave_restored">Custom wave restored.</string>
+    <string name="restore_failed">Couldn\'t restore from that file.</string>
+    <string name="shortcut_added">Added to Steam: %1$s</string>
+</resources>

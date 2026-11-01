@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.minimaui.overlay.systemui">
+    <!-- MinimaUI's fading outlines for SystemUI (quick settings, notifications, power menu, volume panel, brightness bar).
+         Enabled and put on top by the module's service.sh. -->
+    <overlay android:targetPackage="com.android.systemui" android:priority="1" android:isStatic="false" />
+    <application android:hasCode="false" android:label="MinimaUI SystemUI outlines" />
+</manifest>
