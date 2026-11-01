@@ -127,10 +127,8 @@ The first time you run MinimaUI the XMB wave is on, in the author's own look. Ch
 * More emulator intents
 * A logo picker (instead of the MinimaUI logo)
 * Original default BGM
-* App logo
 * UI polish
 * Dual-screen & non 16:9 display support
-* Movable tiles in favorites menu
 * And many more yet to come!
 
 # License
