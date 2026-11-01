@@ -122,6 +122,11 @@ The first time you run MinimaUI the XMB wave is on, in the author's own look. Ch
 * **Volume and brightness bars** over other apps: MinimaUI has an accessibility service for this (Android Settings → Accessibility → MinimaUI). It's off until you enable it, and nothing else needs it.
 * **[ui-overlay](ui-overlay)**: a Magisk module that gives Android's own quick settings, notifications and power menu MinimaUI's soft fading outline. Only for rooted devices, and entirely optional. See its README.
 
+<p>
+  <img src="screenshots/android-overlays.png" width="49%" alt="Android's quick settings and notifications with the ui-overlay module">
+  <img src="screenshots/volume-bar-over-a-game.png" width="49%" alt="The volume bar over a running game">
+</p>
+
 # Future Plans
 * More platforms and emulators (and a menu to add your own)
 * More emulator intents
