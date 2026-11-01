@@ -3,6 +3,20 @@ A minimalist frontend for android handhelds.
 
 ***Minimalist Aesthetics -***  Focused to help with "choice paralysis." A simple home for your retro games with fluid animations and a polished UI, designed to end mindless scrolling through your massive game library, just click-and-play!
 
+# Screenshots
+<p>
+  <img src="screenshots/favorites.png" width="49%" alt="Favorites">
+  <img src="screenshots/all-games.png" width="49%" alt="All Games">
+</p>
+<p>
+  <img src="screenshots/apps.png" width="49%" alt="Apps">
+  <img src="screenshots/search-keyboard.png" width="49%" alt="Search with the on-screen keyboard">
+</p>
+<p>
+  <img src="screenshots/launcher-menu.png" width="49%" alt="The launcher menu">
+  <img src="screenshots/ambient-clock.png" width="49%" alt="The ambient clock when idle">
+</p>
+
 # Minimal Load on the Battery
 No -
 * Online scraping,
