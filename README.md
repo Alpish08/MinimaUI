@@ -136,8 +136,13 @@ The first time you run MinimaUI the XMB wave is on, in the author's own look. Ch
 * Dual-screen & non 16:9 display support
 * And many more yet to come!
 
+# Feedback
+Bugs, ideas, or an emulator or platform you'd like to see: open an [issue](../../issues). MinimaUI is a personal project, so I don't take code contributions; see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 # License
-MinimaUI is free software under the **GNU General Public License v3.0**: you may use, change and share it, and anything you distribute based on it must stay under the same license and come with its source. See [LICENSE](LICENSE).
+MinimaUI is **source-available** under the **PolyForm Strict License 1.0.0**. The code is public so you can see exactly what the app does (it needs *All files access*, and has no network features), and you can use it for any noncommercial purpose, but you may not change it, distribute it or make new works based on it. See [LICENSE](LICENSE).
+
+Versions 2.0 and 2.0.1 were released earlier under the GNU General Public License v3.0; those two releases stay available under that license for anyone who has them. Everything after 2.0.1 is under PolyForm Strict.
 
 # Disclaimer
 * Artificial Intelligence was used in the making of this frontend. I am not familiar with Android Studio, so Claude Code makes the backend for me. However, since Kotlin (coding language used for this app) is similar to Java, which I have experience with, I optimize the code to the best of my abilities. UI design was 100% done by me, no AI was used for assets.
