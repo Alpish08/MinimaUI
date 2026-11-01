@@ -87,6 +87,7 @@ MinimaUI/
     Favorites/
     All Games/<platform>/
   Platform Icons/    optional: your own platform images (create it yourself)
+  Logo.png           optional: your own logo for the bottom of Favorites
 ```
 
 **Sounds**: drop files named like these in `Sounds/` (`.wav`, `.ogg` or `.mp3`); any that are missing fall back to Android's click:
@@ -94,19 +95,32 @@ MinimaUI/
 
 Sounds are not included. If you want a PS Vita feel, the community-made [PS Vita SFX pack on DeckThemes](https://deckthemes.com/packs/view?themeId=9dab732c-e05c-4f4b-a6b4-c648a8c144d3) has the system sounds, including ones MinimaUI doesn't use. Its files are named differently from the list above, so listen to them, pick the ones you like, copy them into `Sounds/` and rename each one to the name MinimaUI expects. That pack is made by someone else and I'm not affiliated with it or with Sony; the sounds belong to their owners, so use them for your own device only.
 
+**The logo** at the bottom of Favorites is the MinimaUI logo. To use your own, put a PNG at `MinimaUI/Logo.png` (about 5:1 wide, light on transparent works best) and restart MinimaUI. A proper logo picker will come later.
+
 **Covers and platform icons** are not bundled: pick your own images with *Select Cover Image* and *Edit Current Platform → Select Platform Icon*. MinimaUI never downloads artwork or metadata.
 
 **Platform icons**: tiles show the platform's name as text until you pick an image. A big collection of console logos (many more consoles than MinimaUI supports yet) is in the [console-logos repository](https://github.com/PRO100BYTE/console-logos/tree/main/Recommended%20Versions%20%28Normal%29%20%281%20Per%20Platform%29%20v2.1). Download the ones you want (check that repository for its terms), put them in `MinimaUI/Platform Icons/`, then in Edit Mode on the All Games page open the Start menu → *Edit Current Platform → Select Platform Icon* and pick the image. The logos belong to their owners.
 
+# The wave
+The first time you run MinimaUI the XMB wave is on, in the author's own look. Change it in *Start → Customization → XMB Wave* (OFF, ON = the original wave, CUSTOM = the MinimaUI ribbon). With CUSTOM selected you can randomize it (**X**) and save the current look (**Y**) as a file in `MinimaUI/Backup/Custom Wave/`; restore one from *Backup / Restore*. The files are plain `key = value` text, so you can also tune them by hand.
+
+# Optional extras
+* **Volume and brightness bars** over other apps: MinimaUI has an accessibility service for this (Android Settings → Accessibility → MinimaUI). It's off until you enable it, and nothing else needs it.
+* **[ui-overlay](ui-overlay)**: a Magisk module that gives Android's own quick settings, notifications and power menu MinimaUI's soft fading outline. Only for rooted devices, and entirely optional. See its README.
+
 # Future Plans
 * More platforms and emulators (and a menu to add your own)
 * More emulator intents
+* A logo picker (instead of the MinimaUI logo)
 * Original default BGM
 * App logo
 * UI polish
 * Dual-screen & non 16:9 display support
 * Movable tiles in favorites menu
 * And many more yet to come!
+
+# License
+MinimaUI is free software under the **GNU General Public License v3.0**: you may use, change and share it, and anything you distribute based on it must stay under the same license and come with its source. See [LICENSE](LICENSE).
 
 # Disclaimer
 * Artificial Intelligence was used in the making of this frontend. I am not familiar with Android Studio, so Claude Code makes the backend for me. However, since Kotlin (coding language used for this app) is similar to Java, which I have experience with, I optimize the code to the best of my abilities. UI design was 100% done by me, no AI was used for assets.

@@ -23,6 +23,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.remember
+import java.io.File
+import android.os.Environment
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -32,15 +35,28 @@ import com.minimaui.app.ui.theme.DotDim
 import com.minimaui.app.ui.theme.IndicatorOn
 import com.minimaui.app.ui.theme.TextPrimary
 
-/** The RP6 logo at the bottom centre of Favorites; [alpha] fades it in after the boot splash. */
+private val MinimaLogoHeight = 72.dp
+
+/**
+ * The logo at the bottom centre of Favorites; [alpha] fades it in after the boot splash. It is the MinimaUI logo unless the user
+ * put their own image at MinimaUI/Logo.png on internal storage (a logo picker will come later).
+ */
 @Composable
-fun RetroidLogo(alpha: Float, modifier: Modifier = Modifier) {
+fun BottomLogo(alpha: Float, modifier: Modifier = Modifier) {
+    val file = remember { File(Environment.getExternalStorageDirectory(), "MinimaUI/Logo.png").takeIf { it.canRead() } }
+    val custom = rememberCover(file?.toURI()?.toString(), 600)
     Box(modifier = modifier.height(Dimens.HintBarHeight), contentAlignment = Alignment.Center) {
-        Image(
-            painter = painterResource(R.drawable.retroid_logo),
-            contentDescription = "RP6",
-            modifier = Modifier.requiredHeight(46.dp).graphicsLayer { this.alpha = alpha }
-        )
+        val logoModifier = Modifier.requiredHeight(46.dp).graphicsLayer { this.alpha = alpha }
+        if (custom != null) {
+            Image(bitmap = custom, contentDescription = "Logo", modifier = logoModifier)
+        } else {
+            // The MinimaUI wordmark is wide and thin, so it gets more height than a custom logo.
+            Image(
+                painter = painterResource(R.drawable.minima_logo),
+                contentDescription = "MinimaUI",
+                modifier = Modifier.requiredHeight(MinimaLogoHeight).graphicsLayer { this.alpha = alpha }
+            )
+        }
     }
 }
 

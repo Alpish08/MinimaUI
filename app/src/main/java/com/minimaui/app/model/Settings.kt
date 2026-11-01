@@ -127,9 +127,9 @@ class Settings(platforms: List<Platform>, private val store: LibraryStore) {
     }
 
     private fun loadWaveStyle(): Int =
-        store.loadString(KEY_WAVE_STYLE)?.toIntOrNull()?.takeIf { it in 0..2 } ?: if (store.loadFlag(KEY_XMB_WAVE, false)) 1 else 0
+        store.loadString(KEY_WAVE_STYLE)?.toIntOrNull()?.takeIf { it in 0..2 } ?: if (store.loadFlag(KEY_XMB_WAVE, false)) 1 else 2
 
-    /** OFF -> ON (the original wave) -> CUSTOM (the Minima ribbon) -> OFF. */
+    /** OFF -> ON (the original wave) -> CUSTOM (the Minima ribbon) -> OFF. A fresh install starts on CUSTOM. */
     fun cycleWaveStyle() {
         waveStyle = (waveStyle + 1) % 3
         store.saveString(KEY_WAVE_STYLE, waveStyle.toString())

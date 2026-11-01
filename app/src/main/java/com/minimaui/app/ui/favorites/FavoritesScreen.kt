@@ -63,7 +63,7 @@ import com.minimaui.app.ui.components.GameTile
 import com.minimaui.app.ui.components.GlowRect
 import com.minimaui.app.ui.components.PageDots
 import com.minimaui.app.ui.components.LocalFocusPulse
-import com.minimaui.app.ui.components.RetroidLogo
+import com.minimaui.app.ui.components.BottomLogo
 import com.minimaui.app.ui.components.TileSize
 import com.minimaui.app.ui.components.ScreenLabel
 import com.minimaui.app.ui.components.SelectionGlow
@@ -261,7 +261,7 @@ fun BentoScreen(
             )
         } else if (!editMode) {
             // Hidden while the boot logo is still travelling to this spot.
-            if (logoAlpha > 0f) RetroidLogo(alpha = logoAlpha, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = Dimens.HintBarBottom))
+            if (logoAlpha > 0f) BottomLogo(alpha = logoAlpha, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = Dimens.HintBarBottom))
         }
     }
 }

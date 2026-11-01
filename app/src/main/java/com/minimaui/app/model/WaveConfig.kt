@@ -109,15 +109,8 @@ class WaveConfig(val values: FloatArray, val target: WaveFadeTarget, val seeds: 
     }
 
     companion object {
-        val Default = WaveConfig(
-            FloatArray(WaveKey.entries.size) { WaveKey.entries[it].default },
-            WaveFadeTarget.All,
-            FloatArray(WaveSeedCount * SeedSize).also {
-                // Fixed seeds, so the default look is the same everywhere (Reseed or Randomize make others).
-                val random = Random(20261027)
-                for (i in 0 until WaveSeedCount) fillSeed(it, i, random)
-            },
-        )
+        /** The look a fresh install starts with: the author's own wave (its text is [DefaultWaveText]; Reseed or Randomize make others). */
+        val Default: WaveConfig = parse(DefaultWaveText) ?: error("The built-in wave look is broken")
 
         /** The text of a custom wave backup file: a note on top, then [toText] (plain `key = value` lines, so it can be edited by hand). */
         fun backupText(config: WaveConfig): String =
@@ -133,6 +126,7 @@ class WaveConfig(val values: FloatArray, val target: WaveFadeTarget, val seeds: 
 
         /** Reads text made by [toText] (or typed by hand); lines it doesn't know are skipped, missing ones keep their default. */
         fun parse(text: String): WaveConfig? {
+            // (While the built-in look itself is being read there is no Default yet; its text always has valid seeds.)
             val pairs = text.lineSequence().mapNotNull { line ->
                 val at = line.indexOf('=')
                 if (at < 0) null else line.substring(0, at).trim() to line.substring(at + 1).trim()
@@ -156,3 +150,28 @@ class WaveConfig(val values: FloatArray, val target: WaveFadeTarget, val seeds: 
             if (v == v.roundToInt().toFloat()) v.roundToInt().toString() else "%.${decimals}f".format(java.util.Locale.US, v).trimEnd('0').trimEnd('.')
     }
 }
+
+/** The built-in wave look, in the same text form as a custom wave backup file. */
+private const val DefaultWaveText = """
+whiteFadeTarget = all
+rop = 73
+fade = 21
+depth = 190
+soft = 2.6
+wfade = 21
+wdepth = 80
+wsoft = 1.7
+dither = 3
+speed = 60
+rand = 40
+lines = 7
+spread = 7
+amp = 48
+freq = 170
+height = 54
+wop = 27
+rw = 3.6
+ww = 1.9
+blur = 3
+seeds = 2.022,0.3458,0.0502,0.1545,0.2692,0.0225,0.9574,0.0545,1.1642,0.7292,0.1567,0.528,2.6921,0.3653,0.8132,0.4013,2.7592,0.7131,0.1107,0.2331,3.5798,0.818,0.1442,0.7977,0.6339,0.6153,0.303,0.369,3.5172,0.3228,0.3113,0.1705,1.7043,0.8757,0.5953,0.5195,0.6176,0.7807,0.8702,0.4816,5.9897,0.5163,0.4652,0.8078,5.6436,0.5919,0.3887,0.5488,4.3015,0.823,0.95,0.7311,1.4604,0.2766,0.6286,0.4827,3.2775,0.8079,0.073,0.8858,3.3137,0.562,0.6332,0.8975
+"""
