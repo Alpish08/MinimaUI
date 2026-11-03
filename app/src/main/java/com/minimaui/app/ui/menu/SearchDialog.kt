@@ -286,7 +286,7 @@ fun SearchDialog(
                 val trackHeight = 150f
                 val trackTop = ResultsY + ((SearchVisibleRows - 1) * ResultPitch + ResultHeight - trackHeight) / 2f
                 val fraction = selected.coerceIn(0, results.lastIndex) / results.lastIndex.toFloat()
-                ScrollSlider(879f, trackTop, trackHeight, fraction, onSeek = onSeekResults)
+                ScrollSlider(860f, trackTop, trackHeight, fraction, onSeek = onSeekResults)
             }
 
             ControlHintBar(

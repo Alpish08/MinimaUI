@@ -31,10 +31,10 @@ When nothing has been touched for 30 seconds the focus glow and the scrolling ti
 * **All Games**: an XMB-style row of platforms with a column of covers under each one (16:9 covers).
 * **Apps**: your apps in pages, separate from the games.
 * **Search** (L2 + R2): type with MinimaUI's own on-screen keyboard (letters and a number pad), or with the touch screen.
-* **Edit Mode**: rearrange favorites, platforms and apps; remove games from the library (and bring them back from the *Hidden Games* page).
+* **Edit Mode**: rearrange favorites, platforms and apps; remove games from the library (and bring them back from the *Hidden Games* page of *Edit Current Platform*, in Edit Mode on All Games).
 * **Per-game and per-platform emulators**: pick any installed app as the emulator, or go back to the original.
 * **Platform tiles** show the platform's name as text; give a platform its own title or image if you like.
-* Optional animated wave, background music, UI sounds, settings backups, and an ambient clock.
+* Optional animated wave, background music, UI sounds, your own boot animation, settings backups, and an ambient clock.
 * Touch, buttons or both.
 
 # Supported platforms and emulators (for now)
@@ -81,8 +81,8 @@ MinimaUI does not include any games, BIOS files, emulators or artwork of the pla
 | **M1 / M2** | send a ripple through the wave |
 
 The **Start menu** has four pages:
-* **Edit Current Game** (or Platform / App): title, cover image, favorite, folder, custom emulator, remove from library, and a second page listing the hidden games.
-* **Customization**: XMB wave, touch, **Edit Mode**, UI smoothness (60 / 120 Hz), sounds, music and volume, and which platforms are shown.
+* **Edit Current Game** (or Platform / App): title, cover image, favorite, folder, custom emulator and remove from library (for a platform: icon, title and default emulator, and a second page listing the hidden games).
+* **Customization**: XMB wave, touch, **Edit Mode**, UI smoothness (60 / 120 Hz), **Boot Animation**, sounds, music and volume, and which platforms are shown.
 * **ROMs Folder(s)**: your ROM folders (**X** removes one, **Y** rescans).
 * **Backup / Restore**: save and restore all settings.
 
@@ -108,6 +108,8 @@ MinimaUI/
 `navigation`, `settings_menu_navigation`, `page_switch`, `app_launch`, `game_launch`, `app_exit`, `game_exit`, `cancel_confirm`, `keyboard`, `toast_menu`, `switch`.
 
 Sounds are not included. If you want a PS Vita feel, the community-made [PS Vita SFX pack on DeckThemes](https://deckthemes.com/packs/view?themeId=9dab732c-e05c-4f4b-a6b4-c648a8c144d3) has the system sounds, including ones MinimaUI doesn't use. Its files are named differently from the list above, so listen to them, pick the ones you like, copy them into `Sounds/` and rename each one to the name MinimaUI expects. That pack is made by someone else and I'm not affiliated with it or with Sony; the sounds belong to their owners, so use them for your own device only.
+
+**Boot animation**: *Customization → Boot Animation* set to CUSTOM opens a file picker; choose a video (any format Android can play, a 16:9 one fills the screen) and it plays instead of the logo every time MinimaUI starts (a button or a tap skips it). Set it back to DEFAULT to forget the video.
 
 **The logo** at the bottom of Favorites is the MinimaUI logo. To use your own, put a PNG at `MinimaUI/Logo.png` (about 5:1 wide, light on transparent works best) and restart MinimaUI. A proper logo picker will come later.
 

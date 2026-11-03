@@ -59,6 +59,8 @@ sealed interface FavView {
 class HomeActions(
     val pickRomFolder: () -> Unit,
     val pickBackgroundMusic: () -> Unit,
+    /** Opens the video picker for the boot animation. */
+    val pickBootVideo: () -> Unit,
     val createBackup: () -> Unit,
     val saveWave: () -> Unit,
     val restoreBackup: () -> Unit,
@@ -829,10 +831,10 @@ class HomeState(
     private val hiddenGames: List<GameEntry>
         get() = library.removedGames()
 
-    /** How many pages the open menu category has: Edit Current Game has a second one (the hidden games) for games, not for apps. */
+    /** How many pages the open menu category has: Edit Current Platform has a second one (the hidden games), only in Edit Mode on All Games. */
     val menuPageCount: Int
         get() = when (menuCategory) {
-            MenuCategory.EditGame -> if (menuContext == MenuContext.Apps || platformEditing) 1 else 2
+            MenuCategory.EditGame -> if (platformEditing) 2 else 1
             else -> menuCategory.pages
         }
 
@@ -850,12 +852,12 @@ class HomeState(
                 MenuEntry("Touch Gestures [${onOff(settings.touchGestures)}]"),
                 MenuEntry(editItemLabel(EditItem.EditMode)),
                 MenuEntry("UI Smoothness [${settings.uiFps} fps]"),
+                MenuEntry("Boot Animation [${if (settings.bootVideoUri != null) "CUSTOM" else "DEFAULT"}]"),
             )
             1 -> listOf(
                 MenuEntry("Menu Sounds [${onOff(settings.menuSounds)}]"),
                 MenuEntry("Background Music [${onOff(settings.backgroundMusic)}]"),
-                MenuEntry("Pick Custom BGM…"),
-                MenuEntry("Remove Custom BGM"),
+                MenuEntry("Pick Menu BGM…"),
                 MenuEntry("Volume", slider = settings.volume),
             )
             else -> menuPlatforms.map { MenuEntry(library.platformTitle(it) ?: it.menuLabel, dot = settings.isPlatformEnabled(it.id)) }
@@ -1619,12 +1621,11 @@ class HomeState(
                 Direction.Left -> if (menuAction % 2 == 1) menuAction - 1 else null
                 Direction.Right -> if (menuAction % 2 == 0) menuAction + 1 else null
             }
-            // Rows: sounds, music, [pick | remove], volume.
+            // Rows: sounds, music, pick, volume.
             MenuLayout.Audio -> when (direction) {
-                Direction.Up -> when (menuAction) { 1 -> 0; 2, 3 -> 1; 4 -> 2; else -> null }
-                Direction.Down -> when (menuAction) { 0 -> 1; 1 -> 2; 2, 3 -> 4; else -> null }
-                Direction.Left -> if (menuAction == 3) 2 else null
-                Direction.Right -> if (menuAction == 2) 3 else null
+                Direction.Up -> menuAction - 1
+                Direction.Down -> menuAction + 1
+                else -> null
             }
         }
         if (target == null || target !in menuEntries.indices) return false
@@ -1658,12 +1659,13 @@ class HomeState(
                     1 -> settings.toggleTouchGestures()
                     2 -> toggleEditModeFromMenu()
                     3 -> settings.cycleUiFps()
+                    // Custom opens the video picker (it stays on the default one if none is picked); going back forgets the video.
+                    4 -> if (settings.bootVideoUri == null) actions.pickBootVideo() else settings.setBootVideo(null)
                 }
                 AudioPage -> when (menuAction) {
                     0 -> settings.toggleMenuSounds()
                     1 -> settings.toggleBackgroundMusic()
                     2 -> actions.pickBackgroundMusic()
-                    3 -> settings.setCustomBgm(null)
                 }
                 else -> menuPlatforms.getOrNull(menuAction)?.let { settings.setPlatformEnabled(it.id, !settings.isPlatformEnabled(it.id)) }
                     .also { clampSelections() }
@@ -2021,7 +2023,7 @@ class HomeState(
         const val XmbRepeatMillis = 55L
         const val EdgeFlipMillis = 750L
         val XmbKeys = setOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight)
-        const val AudioVolumeIndex = 4
+        const val AudioVolumeIndex = 3
         const val AudioPage = 1
         val PlatformMenuOrder =
             listOf("android", "steam", "xbox", "n3ds", "psp", "wiiu", "ps2", "switch", "vita", "windows")

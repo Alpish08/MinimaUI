@@ -40,6 +40,10 @@ class Settings(platforms: List<Platform>, private val store: LibraryStore) {
     var customBgmUri by mutableStateOf(store.loadString(KEY_BGM_URI))
         private set
 
+    /** Persisted URI of the user's boot animation (a video played at start instead of the logo), or null for the default one. */
+    var bootVideoUri by mutableStateOf(store.loadString(KEY_BOOT_VIDEO))
+        private set
+
     private val enabledPlatforms = mutableStateListOf<String>()
 
     /** The order of the platforms in All Games (the user can rearrange it in Edit Mode); starts alphabetical. */
@@ -103,6 +107,12 @@ class Settings(platforms: List<Platform>, private val store: LibraryStore) {
     fun setCustomBgm(uri: String?) {
         customBgmUri = uri
         store.saveString(KEY_BGM_URI, uri)
+    }
+
+    /** Sets the boot animation video; null goes back to the default one and forgets the old video. */
+    fun setBootVideo(uri: String?) {
+        bootVideoUri = uri
+        store.saveString(KEY_BOOT_VIDEO, uri)
     }
 
     fun changeVolume(delta: Int) {
@@ -170,6 +180,7 @@ class Settings(platforms: List<Platform>, private val store: LibraryStore) {
         private const val KEY_BACKGROUND_MUSIC = "backgroundMusic"
         private const val KEY_ROM_FOLDERS = "romFolders"
         private const val KEY_BGM_URI = "customBgm"
+        private const val KEY_BOOT_VIDEO = "bootVideo"
         private const val KEY_VOLUME = "volume"
         private const val KEY_PLATFORM_ORDER = "platformOrder"
         private const val KEY_SORT_RECENT = "sortByRecent"

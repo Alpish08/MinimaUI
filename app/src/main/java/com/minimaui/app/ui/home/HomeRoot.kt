@@ -19,7 +19,12 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.animation.core.Animatable
 import kotlinx.coroutines.delay
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import com.minimaui.app.ui.components.BootLogo
+import com.minimaui.app.ui.components.BootVideo
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import com.minimaui.app.ui.favorites.Direction
@@ -100,6 +105,9 @@ import com.minimaui.app.ui.theme.OledBlack
 
 private enum class HomePage { Favorites, AllGames, Apps }
 
+/** The user's boot animation video: playing, played (or skipped) and fading out, failed to play (the logo comes instead), or not (or no longer) there. */
+private enum class BootVideoPhase { Playing, Finished, Failed, Gone }
+
 private val PillCenterX = (Dimens.DesignWidth - Dimens.StatusPillWidth.value) / 2f
 // In the corner the pill's left edge sits here and its right end runs past the screen edge (like the PS3's).
 private const val PillCornerX = 1465f
@@ -116,6 +124,7 @@ fun HomeRoot(
     dimmed: Boolean = false,
     idle: Boolean = false,
     onBootPlayed: () -> Unit,
+    onBootVideoPlaying: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val state = remember(library, appLibrary, settings) { HomeState(library, appLibrary, settings, actions) }
@@ -128,9 +137,28 @@ fun HomeRoot(
     LaunchedEffect(dimmed) {
         withHalfRateFrames { ambient.animateTo(if (dimmed) 1f else 0f, tween(if (dimmed) 700 else 150)) }
     }
+    // A boot animation of the user's own (a video) plays instead of the logo; the video is the one set when MinimaUI started.
+    val bootVideo = remember { if (playBoot) settings.bootVideoUri else null }
+    var videoPhase by remember { mutableStateOf(if (bootVideo != null) BootVideoPhase.Playing else BootVideoPhase.Gone) }
+    val videoAlpha = remember { Animatable(1f) }
     LaunchedEffect(Unit) {
         if (playBoot) {
             onBootPlayed()
+            if (bootVideo != null) {
+                onBootVideoPlaying(true)
+                snapshotFlow { videoPhase }.first { it != BootVideoPhase.Playing }
+                onBootVideoPlaying(false)
+                if (videoPhase == BootVideoPhase.Finished) {
+                    // The video fades out over the screen, which settles as it does after the logo.
+                    coroutineScope {
+                        launch { videoAlpha.animateTo(0f, tween(600)) }
+                        boot.animateTo(1f, tween(1000, easing = EaseInOut))
+                    }
+                    videoPhase = BootVideoPhase.Gone
+                    return@LaunchedEffect
+                }
+                videoPhase = BootVideoPhase.Gone
+            }
             bootAppear.animateTo(1f, tween(450))
             delay(900)
             boot.animateTo(1f, tween(1000, easing = EaseInOut))
@@ -320,6 +348,11 @@ fun HomeRoot(
             .focusRequester(focusRequester)
             .focusable()
             .onPreviewKeyEvent { event ->
+                // The boot video: a button press skips it (and is not passed on).
+                if (videoPhase == BootVideoPhase.Playing) {
+                    if (event.type == KeyEventType.KeyDown) videoPhase = BootVideoPhase.Finished
+                    return@onPreviewKeyEvent true
+                }
                 // Select is a tap (details card) or a hold with a shoulder button (volume / brightness bars).
                 if (event.key == Key.ButtonStart) {
                     val toggled = state.onStart(event.type == KeyEventType.KeyDown, event.nativeKeyEvent.repeatCount > 0)
@@ -754,6 +787,22 @@ fun HomeRoot(
         AmbientClock(visible = dimmed, fade = ambient)
 
         if (boot.value < 1f) BootLogo(progress = boot.value, appear = bootAppear.value)
+
+        // Any button or a tap skips the video.
+        if (bootVideo != null && videoPhase != BootVideoPhase.Gone) {
+            BootVideo(
+                uri = bootVideo,
+                playing = videoPhase == BootVideoPhase.Playing,
+                volume = settings.volume / 100f,
+                onEnded = { failed ->
+                    if (videoPhase == BootVideoPhase.Playing) videoPhase = if (failed) BootVideoPhase.Failed else BootVideoPhase.Finished
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = videoAlpha.value }
+                    .pointerInput(Unit) { detectTapGestures { if (videoPhase == BootVideoPhase.Playing) videoPhase = BootVideoPhase.Finished } }
+            )
+        }
 
         if (launchFade > 0f) {
             Box(Modifier.fillMaxSize().graphicsLayer { alpha = launchFade }.background(OledBlack))

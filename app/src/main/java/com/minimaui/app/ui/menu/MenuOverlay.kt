@@ -73,7 +73,7 @@ enum class MenuFocus { Categories, Actions }
 /** [HiddenList] is a scrolling list of plain pills (the games taken out of the library), laid out like the ROM folders. */
 enum class MenuLayout { List, Settings, Grid, Folders, Audio, HiddenList }
 
-/** The left-hand list. [pages] > 1 makes the category swipeable: Customization has three (settings, audio, platforms). */
+/** The left-hand list. [pages] > 1 makes the category swipeable: Customization has three (settings, audio, platforms); Edit Current Platform gets a second one (the hidden games) by itself. */
 enum class MenuCategory(val title: String, val pages: Int = 1) {
     EditGame("Edit Current Game"),
     Customize("Customization", pages = 3),
@@ -164,16 +164,17 @@ private fun entryRect(layout: MenuLayout, index: Int, count: Int, scroll: Float 
     }
     // Customization, page 1: slim pills close together.
     MenuLayout.Settings -> {
-        val pitch = 138f
-        val h = 112f
+        // Five entries sit a little closer.
+        val tight = count >= 5
+        val pitch = if (tight) 126f else 138f
+        val h = if (tight) 104f else 112f
         UiRect(SubCenterX - 309f, PagedCenterY - ((count - 1) * pitch + h) / 2f + index * pitch, 618f, h)
     }
-    // Page 2: sounds, music, [pick | remove], volume.
+    // Page 2: sounds, music, pick, volume.
     MenuLayout.Audio -> when (index) {
         0 -> UiRect(855f, 119f, 652f, 117f)
         1 -> UiRect(855f, 269f, 652f, 118f)
-        2 -> UiRect(855f, 419f, 310f, 92f)
-        3 -> UiRect(1197f, 419f, 310f, 92f)
+        2 -> UiRect(SubCenterX - 155f, 419f, 310f, 92f)
         else -> UiRect(855f, 545f, 652f, 138f)
     }
     // Page 3: the platforms, two to a row.
@@ -187,7 +188,7 @@ private fun entryRect(layout: MenuLayout, index: Int, count: Int, scroll: Float 
         if (index < count - 1) {
             UiRect(SubCenterX - FolderRowWidth / 2f, FolderFirstY + index * FolderPitch - scroll, FolderRowWidth, FolderRowHeight)
         } else {
-            UiRect(SubCenterX - 57f, FolderFirstY + index * FolderPitch - scroll, 114f, 52f)
+            UiRect(SubCenterX - PlusWidth / 2f, FolderFirstY + index * FolderPitch + (FolderRowHeight - PlusHeight) / 2f - scroll, PlusWidth, PlusHeight)
         }
     MenuLayout.HiddenList -> UiRect(SubCenterX - FolderRowWidth / 2f, HiddenFirstY + index * HiddenPitch - scroll, FolderRowWidth, HiddenRowHeight)
 }
@@ -207,12 +208,14 @@ private fun entryGrowth(layout: MenuLayout, i: Int, selected: Int): Pair<Float, 
         if (i == selected) GridGrowW to GridGrowH else 0f to 0f
     }
     MenuLayout.Audio -> {
-        // Rows: sounds, music, [pick | remove], volume. The two half-width buttons grow half as much, so they never meet.
-        fun row(k: Int) = if (k < 2) k else if (k < 4) 2 else 3
-        val d = if (row(i) != row(selected)) kotlin.math.abs(row(i) - row(selected)) else if (i == selected) 0 else 1
-        listGrowth(d.toFloat(), if (i in 2..3) ListGrow / 2f else ListGrow, SettingsNeighbor) to 0f
+        // Rows: sounds, music, pick, volume. The half-width button grows half as much.
+        listGrowth(kotlin.math.abs(i - selected).toFloat(), if (i == 2) ListGrow / 2f else ListGrow, SettingsNeighbor) to 0f
     }
 }
+
+// The + pill at the end of the ROM folders.
+private const val PlusWidth = 160f
+private const val PlusHeight = 76f
 
 private const val FolderPitch = 112f
 private const val FolderRowHeight = 88f
@@ -225,6 +228,9 @@ private const val FolderCenterY = SubCenterY
 private const val HiddenRowsShown = 5
 private const val HiddenPitch = 118f
 private const val HiddenRowHeight = 92f
+private const val HiddenTitleY = 84f
+private const val HiddenTitleHeight = 36f
+private const val HiddenTrackHeight = 156f
 private const val HiddenFirstY = SubCenterY - ((HiddenRowsShown - 1) * HiddenPitch + HiddenRowHeight) / 2f
 
 /**
@@ -539,7 +545,7 @@ private fun EntryPage(
                     dot = entry.dot,
                     textColor = if (entry.danger) DangerRed else TextPrimary,
                     alpha = alpha,
-                    textPadding = if (layout == MenuLayout.Audio && i in 2..3) 14.dp else 40.dp,
+                    textPadding = if (layout == MenuLayout.Audio && i == 2) 14.dp else 40.dp,
                     dotInset = when (layout) {
                         MenuLayout.List, MenuLayout.Settings, MenuLayout.Audio -> 38.dp
                         else -> 25.dp
@@ -547,7 +553,7 @@ private fun EntryPage(
                     fontSize = when (layout) {
                         MenuLayout.List -> if (entry.danger) 26.sp else if (dangerLast && entries.size >= 6) 32.sp else 34.sp
                         MenuLayout.Settings -> 34.sp
-                        MenuLayout.Audio -> if (i == 2 || i == 3) 26.sp else 34.sp
+                        MenuLayout.Audio -> if (i == 2) 26.sp else 34.sp
                         MenuLayout.Grid -> 28.sp
                         MenuLayout.Folders, MenuLayout.HiddenList -> 29.sp
                     }
@@ -569,8 +575,17 @@ private fun EntryPage(
             )
         )
 
+        if (layout == MenuLayout.HiddenList) {
+            Box(
+                Modifier.offset(SubBox.x.dp, HiddenTitleY.dp).size(SubBox.width.dp, HiddenTitleHeight.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = "Hidden Games", color = TextPrimary.copy(alpha = 0.6f), fontWeight = FontWeight.Bold, fontSize = 24.sp, maxLines = 1)
+            }
+        }
+
         if (layout.scrolls && entries.size > FolderRowsShown) {
-            val trackHeight = 125f
+            val trackHeight = if (layout == MenuLayout.HiddenList) HiddenTrackHeight else 125f
             val fraction = selected.coerceIn(0, entries.lastIndex) / (entries.size - 1).toFloat()
             ScrollSlider(1585f, SubCenterY - trackHeight / 2f, trackHeight, fraction, onSeek = onSeekList)
         }
@@ -637,7 +652,7 @@ private fun PlusPill(active: Boolean, rect: UiRect, alpha: Float = 1f) {
             .pillOutline(outlineDepthFor(rect.height)) { outline },
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.size((minOf(rect.width, rect.height) * 0.3f).dp)) {
+        Canvas(modifier = Modifier.size((minOf(rect.width, rect.height) * 0.38f).dp)) {
             val stroke = size.width * 0.19f
             drawLine(TextPrimary, Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), stroke, StrokeCap.Round)
             drawLine(TextPrimary, Offset(size.width / 2f, 0f), Offset(size.width / 2f, size.height), stroke, StrokeCap.Round)

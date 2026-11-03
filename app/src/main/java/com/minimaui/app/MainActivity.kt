@@ -62,6 +62,7 @@ class MainActivity : ComponentActivity() {
     private val refreshTick = mutableIntStateOf(0)
     private val scanTick = mutableIntStateOf(0)
     private val launching = mutableStateOf(false)
+    private val bootVideoPlaying = mutableStateOf(false)
     private var pendingCoverGameId: String? = null
     /** The games scanned when a manual rescan started (to tell how many it found), or null. */
     private var rescanBefore: Set<String>? = null
@@ -77,6 +78,13 @@ class MainActivity : ComponentActivity() {
         if (uri != null) {
             contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             settings.setCustomBgm(StoredUris.persistent(uri.toString()))
+        }
+    }
+
+    private val bootVideoPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            settings.setBootVideo(StoredUris.persistent(uri.toString()))
         }
     }
 
@@ -121,6 +129,7 @@ class MainActivity : ComponentActivity() {
         val actions = HomeActions(
             pickRomFolder = { suppressHomeSound = true; romFolderPicker.launch(null) },
             pickBackgroundMusic = { suppressHomeSound = true; bgmPicker.launch(arrayOf("audio/*")) },
+            pickBootVideo = { suppressHomeSound = true; bootVideoPicker.launch(arrayOf("video/*")) },
             createBackup = ::createBackup,
             saveWave = ::saveWave,
             restoreBackup = { suppressHomeSound = true; backupPicker.launch(arrayOf("*/*")) },
@@ -178,8 +187,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             // UI Smoothness: 60 or 120 Hz display mode.
             LaunchedEffect(settings.uiFps) { applyRefreshRate() }
-            LaunchedEffect(settings.backgroundMusic, settings.customBgmUri) {
-                bgm.update(settings.backgroundMusic, settings.customBgmUri)
+            // The music waits while the boot video plays (it has its own sound).
+            LaunchedEffect(settings.backgroundMusic, settings.customBgmUri, bootVideoPlaying.value) {
+                bgm.update(settings.backgroundMusic && !bootVideoPlaying.value, settings.customBgmUri)
             }
             // The ROM folders are walked only when there is no saved scan for them (first launch), when one is added or
             // removed, and on a manual rescan. Everything else (returning to the app, adding an app game) just rebuilds
@@ -225,7 +235,8 @@ class MainActivity : ComponentActivity() {
                         playBoot = !bootPlayed && !cameBackFromLaunch,
                         dimmed = dimState.value,
                         idle = idleState.value,
-                        onBootPlayed = { bootPlayed = true }
+                        onBootPlayed = { bootPlayed = true },
+                        onBootVideoPlaying = { bootVideoPlaying.value = it }
                     )
                 }
             }
