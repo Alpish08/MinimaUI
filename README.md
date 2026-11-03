@@ -49,7 +49,7 @@ More platforms and emulators will be added as feedback comes in, so please tell 
 | Nintendo 3DS | `.cci .3ds .cia` | Azahar |
 | Wii U | `.wux .wud .wua` | Cemu |
 | PSP | `.iso .cso .pbp` | PPSSPP / PPSSPP Gold |
-| PS2 | `.chd .iso` | AetherSX2 / NetherSX2 |
+| PS2 | `.chd .iso` | ArmSX2 / AetherSX2 / NetherSX2 |
 | PS Vita | `.psvita` (a text file holding the game's title id) | Vita3K |
 | Xbox | `.xiso .iso` | HakuX |
 

@@ -54,6 +54,9 @@ private const val MaxPulses = 4
 private const val RippleCols = 96
 private const val RippleRange = 64f
 
+/** How far in from the left and right edge (a share of the width) the ribbon fades into black. */
+private const val RibbonEdgeFade = 0.2f
+
 /** A ripple lives this long, in seconds; it enters just outside one side, travels across the 960 x 540 design space and dies away. */
 private const val PulseSeconds = 2.4f
 
@@ -280,6 +283,11 @@ half4 main(float2 p) {
         float a = min(c * red.w * misc.w / pow(blur, 0.7) / (1.0 + lineBlur / scale * 0.12) * (1.0 + lift), 1.0);
         acc = float4(float3(1.0, 0.227, 0.227) * a, a) + acc * (1.0 - a);
     }
+    // Into black at the left and right edge.
+    // Not a smoothstep: that stays near zero for the last stretch, so the lines would already be gone well before the edge.
+    float ex = d.x / w;
+    float edgeIn = clamp(min(ex, 1.0 - ex) / $RibbonEdgeFade, 0.0, 1.0);
+    acc *= 1.0 - pow(1.0 - edgeIn, 1.5);
     return half4(half3(acc.rgb), half(acc.a));
 }
 """

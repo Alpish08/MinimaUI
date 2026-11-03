@@ -114,7 +114,7 @@ class GameLauncher(private val context: Context) {
                 .setComponent(ComponentName(target.packageName, target.className))
                 .setData(rom)
                 .putExtra("bootPath", path)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION or Intent.FLAG_GRANT_READ_URI_PERMISSION or freshTaskFlags(target.packageName))
             try {
                 context.startActivity(intent, noTransition)
                 return null
@@ -157,19 +157,26 @@ class GameLauncher(private val context: Context) {
     /** Opens [rom] in the app [packageName]: its own handler for the file, else the app's front door with the file attached. */
     private fun openRomWith(packageName: String, label: String, rom: Uri): String? {
         val grant = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION or Intent.FLAG_GRANT_READ_URI_PERMISSION
+        // An emulator whose own activity is known (ArmSX2 only starts a game that way) gets it first.
+        val known = emulators.values.flatten().map(::Target).firstOrNull { it.packageName == packageName && it.packageName in freshTask }
         val attempts = listOfNotNull(
+            known?.let { Intent(Intent.ACTION_VIEW).setComponent(ComponentName(it.packageName, it.className)).setData(rom).putExtra("bootPath", filePath(rom)) },
             Intent(Intent.ACTION_VIEW).setPackage(packageName).setData(rom).putExtra("bootPath", filePath(rom)),
             context.packageManager.getLaunchIntentForPackage(packageName)?.setData(rom),
         )
         for (intent in attempts) {
             try {
-                context.startActivity(intent.addFlags(grant), noTransition)
+                context.startActivity(intent.addFlags(grant or freshTaskFlags(packageName)), noTransition)
                 return null
             } catch (_: Exception) {
             }
         }
         return "$label could not open the game"
     }
+
+    /** ArmSX2 is started with clear-task + clear-top, so a game that is already running is replaced. */
+    private fun freshTaskFlags(packageName: String): Int =
+        if (packageName in freshTask) Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP else 0
 
     private fun appLabel(packageName: String): String = runCatching {
         context.packageManager.getApplicationInfo(packageName, 0).loadLabel(context.packageManager).toString()
@@ -189,6 +196,9 @@ class GameLauncher(private val context: Context) {
         /** Platforms launched through an emulator found by its app name. */
         val byLabel = mapOf("xbox" to "hakux")
 
+        /** Emulators that want their task cleared when a game starts. */
+        val freshTask = setOf("come.nanodata.armsx2", "com.armsx2")
+
         /** Tried by app name when none of a platform's known packages is installed. */
         val fallbackLabels = mapOf("n3ds" to "azahar", "switch" to "eden", "wiiu" to "cemu")
 
@@ -204,6 +214,8 @@ class GameLauncher(private val context: Context) {
                 "org.ppsspp.ppssppgold/org.ppsspp.ppsspp.PpssppActivity",
             ),
             "ps2" to listOf(
+                "come.nanodata.armsx2/com.armsx2.MainActivity",
+                "com.armsx2/com.armsx2.MainActivity",
                 "xyz.aethersx2.android/xyz.aethersx2.android.EmulationActivity",
                 "xyz.nethersx2.android/xyz.nethersx2.android.EmulationActivity",
                 "xyz.aethersx2.android/xyz.aethersx2.android.MainActivity",

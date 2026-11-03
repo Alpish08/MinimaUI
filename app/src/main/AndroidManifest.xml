@@ -42,6 +42,8 @@
         <package android:name="org.ppsspp.ppssppgold" />
         <package android:name="xyz.aethersx2.android" />
         <package android:name="xyz.nethersx2.android" />
+        <package android:name="com.armsx2" />
+        <package android:name="come.nanodata.armsx2" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
