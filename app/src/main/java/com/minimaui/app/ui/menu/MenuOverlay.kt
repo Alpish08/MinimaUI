@@ -238,7 +238,6 @@ private const val HiddenRowHeight = 92f
 private const val HiddenTitleHeight = 36f
 private const val HiddenTrackHeight = 156f
 private const val HiddenFirstY = SubCenterY - ((HiddenRowsShown - 1) * HiddenPitch + HiddenRowHeight) / 2f
-private val HiddenTitleY = (SubBox.y + HiddenFirstY) / 2f - HiddenTitleHeight / 2f
 
 /**
  * How visible a hidden-games row is: the rows at the ends of the five fade out gradually (the outermost is half visible, the
@@ -595,12 +594,19 @@ private fun EntryPage(
             underStrength = UnfocusedOutline
         )
 
-        if (layout == MenuLayout.HiddenList) {
+        val listTitle = when (layout) {
+            MenuLayout.HiddenList -> "Hidden Games"
+            MenuLayout.Grid -> if (entries.isNotEmpty()) "Platforms" else null
+            else -> null
+        }
+        if (listTitle != null) {
+            // Halfway between the top of the box and the first row.
+            val titleY = (SubBox.y + entryRect(layout, 0, entries.size, 0f, dangerLast, paged).y) / 2f - HiddenTitleHeight / 2f
             Box(
-                Modifier.offset(SubBox.x.dp, HiddenTitleY.dp).size(SubBox.width.dp, HiddenTitleHeight.dp),
+                Modifier.offset(SubBox.x.dp, titleY.dp).size(SubBox.width.dp, HiddenTitleHeight.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = "Hidden Games", color = TextPrimary.copy(alpha = 0.6f), fontWeight = FontWeight.Bold, fontSize = 24.sp, maxLines = 1)
+                Text(text = listTitle, color = TextPrimary.copy(alpha = 0.6f), fontWeight = FontWeight.Bold, fontSize = 24.sp, maxLines = 1)
             }
         }
 

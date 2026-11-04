@@ -82,7 +82,7 @@ MinimaUI does not include any games, BIOS files, emulators or artwork of the pla
 
 The **Start menu** has four pages:
 * **Edit Current Game** (or Platform / App): title, cover image, favorite, folder, custom emulator and remove from library (for a platform: icon, title and default emulator, and a second page listing the hidden games).
-* **Customization**: XMB wave, touch, **Edit Mode**, UI smoothness (60 / 120 Hz), **Boot Animation**, **Idle Clock**, sounds, music and volume, and which platforms are shown.
+* **Customization**: XMB wave, touch, **Edit Mode**, UI smoothness (60 / 120 Hz), **Boot Animation**, **Idle Clock**, sounds, music and volume, and (in Edit Mode on All Games or Favorites) which platforms are shown.
 * **ROMs Folder(s)**: your ROM folders (**X** removes one, **Y** rescans).
 * **Backup / Restore**: save and restore all settings.
 

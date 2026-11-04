@@ -838,6 +838,8 @@ class HomeState(
     val menuPageCount: Int
         get() = when (menuCategory) {
             MenuCategory.EditGame -> if (platformEditing) 2 else 1
+            // The platforms page is only offered in Edit Mode on All Games and Favorites, where it matters most.
+            MenuCategory.Customize -> if (platformsPageShown) 3 else 2
             else -> menuCategory.pages
         }
 
@@ -860,7 +862,7 @@ class HomeState(
             )
             1 -> listOf(
                 MenuEntry("Menu Sounds [${onOff(settings.menuSounds)}]"),
-                MenuEntry("Background Music [${if (!settings.backgroundMusic) "OFF" else if (settings.shuffleMusic) "SHUFFLE" else "ON"}]"),
+                MenuEntry("Background Music [${if (!settings.backgroundMusic) "OFF" else if (settings.shuffleMusic) "SHUFFLE" else "CUSTOM"}]"),
                 MenuEntry("Pick Menu BGM…"),
                 MenuEntry("Volume", slider = settings.volume),
             )
@@ -893,6 +895,7 @@ class HomeState(
 
     /** Edit Mode on the platform row of All Games. */
     private val platformEditing: Boolean get() = editMode && screen == HomeScreen.AllGames
+    private val platformsPageShown: Boolean get() = editMode && (screen == HomeScreen.AllGames || screen == HomeScreen.Favorites)
 
     /** True if X on [item] would take something away: the game's own emulator, or the platform's icon, title or emulator. */
     private fun canRemoveEditItem(item: EditItem?): Boolean {
