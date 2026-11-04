@@ -135,7 +135,7 @@ private fun categoryRect(index: Int): UiRect {
 }
 
 // Lists are centred vertically in the panel; the grid and folder layouts have fixed tops.
-private fun entryRect(layout: MenuLayout, index: Int, count: Int, scroll: Float = 0f, dangerLast: Boolean = false): UiRect = when (layout) {
+private fun entryRect(layout: MenuLayout, index: Int, count: Int, scroll: Float = 0f, dangerLast: Boolean = false, paged: Boolean = true): UiRect = when (layout) {
     MenuLayout.List -> if (dangerLast) {
         // The regular entries stack, then a gap, then the small destructive one; the whole group is centred in the box.
         // With five or more regular entries the pills are slimmer so the group still fits.
@@ -147,8 +147,8 @@ private fun entryRect(layout: MenuLayout, index: Int, count: Int, scroll: Float 
         val gap = pitch - h
         val dangerH = if (tight) 66f else 72f
         val group = (regular - 1) * pitch + h + gap + dangerH
-        // A little above the middle, which leaves room for the page dots under it.
-        val top = PagedCenterY - group / 2f
+        // A little above the middle when page dots sit under it; in the middle when there are none.
+        val top = (if (paged) PagedCenterY else SubCenterY) - group / 2f
         if (index < regular) UiRect(SubCenterX - 309f, top + index * pitch, 618f, h)
         else UiRect(SubCenterX - 195f, top + (regular - 1) * pitch + h + gap, 390f, dangerH)
     } else {
@@ -214,8 +214,8 @@ private fun entryGrowth(layout: MenuLayout, i: Int, selected: Int): Pair<Float, 
 }
 
 // The + pill at the end of the ROM folders.
-private const val PlusWidth = 160f
-private const val PlusHeight = 76f
+private const val PlusWidth = 132f
+private const val PlusHeight = 62f
 
 private const val FolderPitch = 112f
 private const val FolderRowHeight = 88f
@@ -228,10 +228,10 @@ private const val FolderCenterY = SubCenterY
 private const val HiddenRowsShown = 5
 private const val HiddenPitch = 118f
 private const val HiddenRowHeight = 92f
-private const val HiddenTitleY = 84f
 private const val HiddenTitleHeight = 36f
 private const val HiddenTrackHeight = 156f
 private const val HiddenFirstY = SubCenterY - ((HiddenRowsShown - 1) * HiddenPitch + HiddenRowHeight) / 2f
+private val HiddenTitleY = (SubBox.y + HiddenFirstY) / 2f - HiddenTitleHeight / 2f
 
 /**
  * How visible a hidden-games row is: the rows at the ends of the five fade out gradually (the outermost is half visible, the
@@ -293,6 +293,8 @@ fun MenuOverlay(
     val subBoxShape = RoundedCornerShape(SubBoxCorner.dp)
     val layout = category.layout(page)
     val entries = entriesFor(page)
+    // Page dots under the entries (the settings, audio and platform pages, and the hidden games) push them a little up.
+    val paged = pages > 1
     val scope = rememberCoroutineScope()
 
     // Where the pages are, in page units (a drag moves it with the finger, otherwise it eases to the current page).
@@ -349,8 +351,8 @@ fun MenuOverlay(
                         return@detectTapGestures
                     }
                     entries.indices.firstOrNull { i ->
-                        entryRect(layout, i, entries.size, folderScroll, dangerLast).contains() &&
-                            (!layout.scrolls || scrollFade(layout, entryRect(layout, i, entries.size, folderScroll, dangerLast), folderScroll, entries.size) > 0.3f)
+                        entryRect(layout, i, entries.size, folderScroll, dangerLast, paged).contains() &&
+                            (!layout.scrolls || scrollFade(layout, entryRect(layout, i, entries.size, folderScroll, dangerLast, paged), folderScroll, entries.size) > 0.3f)
                     }?.let { onTapEntry(it) }
                 }
             }
@@ -451,6 +453,7 @@ fun MenuOverlay(
                             entries = if (settled) (if (here) entries else entriesFor(p)) else lastShown.pages[p],
                             selected = if (!here) -1 else if (settled) selected else lastShown.selected,
                             focused = here && focus == MenuFocus.Actions && settled,
+                            paged = pages > 1,
                             onSeekVolume = onSeekVolume,
                             onSeekList = onSeekList,
                         )
@@ -499,6 +502,7 @@ private fun EntryPage(
     entries: List<MenuEntry>,
     selected: Int,
     focused: Boolean,
+    paged: Boolean,
     onSeekVolume: (Int) -> Unit,
     onSeekList: (Float) -> Unit,
 ) {
@@ -517,7 +521,7 @@ private fun EntryPage(
         // Glow sits behind every item so it shows through neighbouring (translucent) pills.
         SelectionGlow(
             if (focused && selected in entries.indices) {
-                entryRect(layout, selected, entries.size, folderScroll, dangerLast).grown(selectedGrow.first, selectedGrow.second).toGlow()
+                entryRect(layout, selected, entries.size, folderScroll, dangerLast, paged).grown(selectedGrow.first, selectedGrow.second).toGlow()
             } else {
                 null
             },
@@ -529,7 +533,7 @@ private fun EntryPage(
             val growTarget = if (focused) entryGrowth(layout, i, selected) else 0f to 0f
             val growW by animateFloatAsState(growTarget.first, tween(200), label = "entryGrowW")
             val growH by animateFloatAsState(growTarget.second, tween(200), label = "entryGrowH")
-            val rect = entryRect(layout, i, entries.size, animatedScroll, dangerLast).grown(growW, growH)
+            val rect = entryRect(layout, i, entries.size, animatedScroll, dangerLast, paged).grown(growW, growH)
             val alpha = if (layout.scrolls) scrollFade(layout, rect, animatedScroll, entries.size) else 1f
             if (alpha <= 0f) return@forEachIndexed
             val active = focused && i == selected
@@ -564,14 +568,14 @@ private fun EntryPage(
         // The entry's outline pulses.
         FocusRing(
             if (focused && selected in entries.indices) {
-                entryRect(layout, selected, entries.size, folderScroll, dangerLast)
+                entryRect(layout, selected, entries.size, folderScroll, dangerLast, paged)
                     .grown(selectedGrow.first, selectedGrow.second)
-                    .toGlow(if (entries[selected].slider != null) 60f else entryRect(layout, selected, entries.size, 0f, dangerLast).height / 2f)
+                    .toGlow(if (entries[selected].slider != null) 60f else entryRect(layout, selected, entries.size, 0f, dangerLast, paged).height / 2f)
             } else {
                 null
             },
             fadeDepth = outlineDepthFor(
-                if (selected in entries.indices) entryRect(layout, selected, entries.size, 0f, dangerLast).height else 0f
+                if (selected in entries.indices) entryRect(layout, selected, entries.size, 0f, dangerLast, paged).height else 0f
             )
         )
 
@@ -652,7 +656,7 @@ private fun PlusPill(active: Boolean, rect: UiRect, alpha: Float = 1f) {
             .pillOutline(outlineDepthFor(rect.height)) { outline },
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.size((minOf(rect.width, rect.height) * 0.38f).dp)) {
+        Canvas(modifier = Modifier.size((minOf(rect.width, rect.height) * 0.36f).dp)) {
             val stroke = size.width * 0.19f
             drawLine(TextPrimary, Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), stroke, StrokeCap.Round)
             drawLine(TextPrimary, Offset(size.width / 2f, 0f), Offset(size.width / 2f, size.height), stroke, StrokeCap.Round)

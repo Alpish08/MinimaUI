@@ -877,7 +877,9 @@ class HomeState(
                 MenuCategory.EditGame ->
                     if (canRemoveEditItem(editItems.getOrNull(menuAction))) listOf(ControlHint("X", "Remove")) + base else base
                 MenuCategory.RomFolders ->
-                    listOf(ControlHint("X", "Remove Selected Folder"), ControlHint("Y", "Rescan")) + base
+                    // The + at the end of the list has no folder to remove.
+                    (if (menuAction < settings.romFolders.size) listOf(ControlHint("X", "Remove Selected Folder")) else emptyList()) +
+                        ControlHint("Y", "Rescan") + base
                 MenuCategory.Customize ->
                     if (menuPage == 0 && menuAction == WaveRow) listOf(ControlHint("X", "Randomize"), ControlHint("Y", "Save Current")) + base
                     else base
