@@ -15,12 +15,14 @@ import java.io.File
 enum class Sfx(val file: String, val fallback: Sfx? = null, val optional: Boolean = false) {
     Navigate("navigation"),
     MenuNavigate("settings_menu_navigation"),
-    /** Opening the settings menu or the launcher menu (the nine-dot one). */
+    /** Opening the launcher menu (the nine-dot one). */
     Menu("menu", fallback = MenuNavigate),
     /** Pushing against the end of a page, list or menu (switched off for now: see EdgeSoundOn in HomeRoot). */
     Edge("edge", optional = true),
     /** Entering Edit Mode. */
     EditMode("edit_mode", optional = true),
+    /** Opening the search. */
+    Search("search"),
     PageSwitch("page_switch"),
     AppLaunch("app_launch"),
     GameLaunch("game_launch"),

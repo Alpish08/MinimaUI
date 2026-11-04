@@ -856,6 +856,7 @@ class HomeState(
                 MenuEntry(editItemLabel(EditItem.EditMode)),
                 MenuEntry("UI Smoothness [${settings.uiFps} fps]"),
                 MenuEntry("Boot Animation [${if (settings.bootVideoUri != null) "CUSTOM" else "DEFAULT"}]"),
+                MenuEntry("Ambient Clock [${onOff(settings.ambientClock)}]"),
             )
             1 -> listOf(
                 MenuEntry("Menu Sounds [${onOff(settings.menuSounds)}]"),
@@ -1670,6 +1671,7 @@ class HomeState(
                     3 -> settings.cycleUiFps()
                     // Custom opens the video picker (it stays on the default one if none is picked); going back forgets the video.
                     4 -> if (settings.bootVideoUri == null) actions.pickBootVideo() else settings.setBootVideo(null)
+                    5 -> settings.toggleAmbientClock()
                 }
                 AudioPage -> when (menuAction) {
                     0 -> settings.toggleMenuSounds()

@@ -12,6 +12,8 @@ import com.minimaui.app.data.LibraryStore
 /** User-adjustable app settings shown in the start menu. */
 class Settings(platforms: List<Platform>, private val store: LibraryStore) {
     var menuSounds by mutableStateOf(store.loadFlag(KEY_MENU_SOUNDS, true))
+    /** The analog clock over the dimmed idle screen. */
+    var ambientClock by mutableStateOf(store.loadFlag(KEY_AMBIENT_CLOCK, true))
         private set
     var backgroundMusic by mutableStateOf(store.loadFlag(KEY_BACKGROUND_MUSIC, true))
         private set
@@ -125,6 +127,11 @@ class Settings(platforms: List<Platform>, private val store: LibraryStore) {
         store.saveString(KEY_VOLUME, volume.toString())
     }
 
+    fun toggleAmbientClock() {
+        ambientClock = !ambientClock
+        store.saveFlag(KEY_AMBIENT_CLOCK, ambientClock)
+    }
+
     fun toggleTouchGestures() {
         touchGestures = !touchGestures
         store.saveFlag(KEY_TOUCH_GESTURES, touchGestures)
@@ -177,6 +184,7 @@ class Settings(platforms: List<Platform>, private val store: LibraryStore) {
         private const val KEY_UI_FPS = "uiFps"
         val UiFpsChoices = listOf(60, 120)
         private const val KEY_MENU_SOUNDS = "menuSounds"
+        private const val KEY_AMBIENT_CLOCK = "ambientClock"
         private const val KEY_BACKGROUND_MUSIC = "backgroundMusic"
         private const val KEY_ROM_FOLDERS = "romFolders"
         private const val KEY_BGM_URI = "customBgm"

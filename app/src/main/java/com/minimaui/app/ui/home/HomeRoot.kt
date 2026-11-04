@@ -137,8 +137,9 @@ fun HomeRoot(
     val bootAppear = remember { Animatable(if (playBoot) 0f else 1f) }
     // The ambient clock fades in over the dimmed screen with the boot logo's dim patch, and blurs the middle of the screen under it.
     val ambient = remember { Animatable(0f) }
-    LaunchedEffect(dimmed) {
-        withHalfRateFrames { ambient.animateTo(if (dimmed) 1f else 0f, tween(if (dimmed) 700 else 150)) }
+    val clockOn = settings.ambientClock
+    LaunchedEffect(dimmed, clockOn) {
+        withHalfRateFrames { ambient.animateTo(if (dimmed && clockOn) 1f else 0f, tween(if (dimmed) 700 else 150)) }
     }
     // A boot animation of the user's own (a video) plays instead of the logo; the video is the one set when MinimaUI started.
     val bootVideo = remember { if (playBoot) settings.bootVideoUri else null }
@@ -175,7 +176,7 @@ fun HomeRoot(
     state.confirmSound = { if (settings.menuSounds) uiSounds.play(Sfx.CancelConfirm) }
     state.menuSound = { if (settings.menuSounds) uiSounds.play(Sfx.Menu) }
     state.editModeSound = { if (settings.menuSounds) uiSounds.play(Sfx.EditMode) }
-    state.searchSound = { if (settings.menuSounds) uiSounds.play(Sfx.ModeSwitch) }
+    state.searchSound = { if (settings.menuSounds) uiSounds.play(Sfx.Search) }
     state.keySound = { if (settings.menuSounds) uiSounds.play(Sfx.Keyboard) }
     state.switchSound = { if (settings.menuSounds) uiSounds.play(Sfx.ModeSwitch) }
     state.toastSound = { if (settings.menuSounds) uiSounds.play(Sfx.Toast) }
@@ -359,10 +360,8 @@ fun HomeRoot(
                 }
                 // Select is a tap (details card) or a hold with a shoulder button (volume / brightness bars).
                 if (event.key == Key.ButtonStart) {
-                    val menuWas = state.menuOpen
                     val toggled = state.onStart(event.type == KeyEventType.KeyDown, event.nativeKeyEvent.repeatCount > 0)
-                    // Start opens (and closes) the settings menu with the menu sound; the other things it confirms keep the old one.
-                    if (toggled && settings.menuSounds) uiSounds.play(if (state.menuOpen != menuWas) Sfx.Menu else Sfx.MenuNavigate)
+                    if (toggled && settings.menuSounds) uiSounds.play(Sfx.MenuNavigate)
                     return@onPreviewKeyEvent true
                 }
                 if (event.key == Key.ButtonSelect) {
@@ -448,8 +447,7 @@ fun HomeRoot(
                                     if (state.moreIndex != 2) uiSounds.play(Sfx.CancelConfirm)
                                 moreBefore && !state.moreOpen && (event.key == Key.ButtonB || event.key == Key.Back || event.key == Key.Escape) -> Unit
                                 // Opening the settings menu or switching between Favorites / All Games / Apps; closing the menu is silent.
-                                state.menuOpen && !menuBefore -> uiSounds.play(Sfx.Menu)
-                                state.screen != screenBefore -> uiSounds.play(Sfx.MenuNavigate)
+                                state.menuOpen && !menuBefore || state.screen != screenBefore -> uiSounds.play(Sfx.MenuNavigate)
                                 menuBefore && !state.menuOpen -> Unit
                                 // Page changes play their own sound (so the right stick and touch swipes get it too); at the last or first page it is the edge sound.
                                 event.key == Key.ButtonL1 || event.key == Key.ButtonR1 ->
@@ -798,7 +796,7 @@ fun HomeRoot(
         }
 
         // While the screen is dimmed after a while without input, an analog clock shows over it (a tap or button wakes it).
-        AmbientClock(visible = dimmed, fade = ambient)
+        AmbientClock(visible = dimmed && clockOn, fade = ambient)
 
         if (boot.value < 1f) BootLogo(progress = boot.value, appear = bootAppear.value)
 

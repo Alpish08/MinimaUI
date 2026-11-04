@@ -82,7 +82,7 @@ MinimaUI does not include any games, BIOS files, emulators or artwork of the pla
 
 The **Start menu** has four pages:
 * **Edit Current Game** (or Platform / App): title, cover image, favorite, folder, custom emulator and remove from library (for a platform: icon, title and default emulator, and a second page listing the hidden games).
-* **Customization**: XMB wave, touch, **Edit Mode**, UI smoothness (60 / 120 Hz), **Boot Animation**, sounds, music and volume, and which platforms are shown.
+* **Customization**: XMB wave, touch, **Edit Mode**, UI smoothness (60 / 120 Hz), **Boot Animation**, **Ambient Clock**, sounds, music and volume, and which platforms are shown.
 * **ROMs Folder(s)**: your ROM folders (**X** removes one, **Y** rescans).
 * **Backup / Restore**: save and restore all settings.
 
@@ -105,7 +105,7 @@ MinimaUI/
 ```
 
 **Sounds**: drop files named like these in `Sounds/` (`.wav`, `.ogg`, `.mp3` or `.m4a`); any that are missing fall back to Android's click:
-`navigation`, `settings_menu_navigation`, `menu`, `edit_mode`, `page_switch`, `app_launch`, `game_launch`, `app_exit`, `game_exit`, `cancel_confirm`, `keyboard`, `toast_menu`, `mode_switch`. `menu` is for opening the settings and launcher menus (falls back to `settings_menu_navigation`), `edit_mode` is for entering Edit Mode (silent when missing), `mode_switch` for the keyboard's ABC / 123 switch and for opening the search, and `cancel_confirm` for choosing an item in a menu.
+`navigation`, `settings_menu_navigation`, `menu`, `edit_mode`, `search`, `page_switch`, `app_launch`, `game_launch`, `app_exit`, `game_exit`, `cancel_confirm`, `keyboard`, `toast_menu`, `mode_switch`. `settings_menu_navigation` is for opening the settings menu and switching between Favorites, All Games and Apps, `menu` for opening the launcher (nine-dot) menu (falls back to `settings_menu_navigation`), `edit_mode` for entering Edit Mode (silent when missing), `search` for opening the search, `mode_switch` for the keyboard's ABC / 123 switch, and `cancel_confirm` for choosing an item in a menu.
 
 Sounds are not included. If you want a PS Vita feel, the community-made [PS Vita SFX pack on DeckThemes](https://deckthemes.com/packs/view?themeId=9dab732c-e05c-4f4b-a6b4-c648a8c144d3) has the system sounds, including ones MinimaUI doesn't use. Its files are named differently from the list above, so listen to them, pick the ones you like, copy them into `Sounds/` and rename each one to the name MinimaUI expects. That pack is made by someone else and I'm not affiliated with it or with Sony; the sounds belong to their owners, so use them for your own device only.
 

@@ -164,11 +164,12 @@ private fun entryRect(layout: MenuLayout, index: Int, count: Int, scroll: Float 
     }
     // Customization, page 1: slim pills close together.
     MenuLayout.Settings -> {
-        // Five entries sit a little closer.
+        // Five entries sit a little closer; more than five scroll, five showing at a time.
         val tight = count >= 5
-        val pitch = if (tight) 126f else 138f
-        val h = if (tight) 104f else 112f
-        UiRect(SubCenterX - 309f, PagedCenterY - ((count - 1) * pitch + h) / 2f + index * pitch, 618f, h)
+        val pitch = if (tight) SettingsPitch else 138f
+        val h = if (tight) SettingsRowHeight else 112f
+        val shown = minOf(count, SettingsRowsShown)
+        UiRect(SubCenterX - 309f, PagedCenterY - ((shown - 1) * pitch + h) / 2f + index * pitch - scroll, 618f, h)
     }
     // Page 2: sounds, music, pick, volume.
     MenuLayout.Audio -> when (index) {
@@ -224,6 +225,12 @@ private const val FolderRowsShown = 5
 private const val FolderFirstY = 162f
 private const val FolderCenterY = SubCenterY
 
+// The first page of Customization: five rows at a time, the pills keep their size however many entries there are.
+private const val SettingsRowsShown = 5
+private const val SettingsPitch = 126f
+private const val SettingsRowHeight = 104f
+private const val SettingsFirstY = PagedCenterY - ((SettingsRowsShown - 1) * SettingsPitch + SettingsRowHeight) / 2f
+
 // The hidden games: five rows at a time, the ones at the ends fading out like the search results.
 private const val HiddenRowsShown = 5
 private const val HiddenPitch = 118f
@@ -237,10 +244,10 @@ private val HiddenTitleY = (SubBox.y + HiddenFirstY) / 2f - HiddenTitleHeight / 
  * How visible a hidden-games row is: the rows at the ends of the five fade out gradually (the outermost is half visible, the
  * next one gone), but only at an end that has more games beyond it, so the first and last games of the list stay whole.
  */
-private fun hiddenFade(rect: UiRect, scroll: Float, count: Int): Float {
-    val slot = (rect.y - HiddenFirstY) / HiddenPitch
-    val above = (scroll / HiddenPitch).coerceIn(0f, 1f)
-    val below = (count - HiddenRowsShown - scroll / HiddenPitch).coerceIn(0f, 1f)
+private fun hiddenFade(rect: UiRect, scroll: Float, count: Int, firstY: Float = HiddenFirstY, pitch: Float = HiddenPitch): Float {
+    val slot = (rect.y - firstY) / pitch
+    val above = (scroll / pitch).coerceIn(0f, 1f)
+    val below = (count - HiddenRowsShown - scroll / pitch).coerceIn(0f, 1f)
     val top = 1f + (((slot + 1f) / 2f).coerceIn(0f, 1f) - 1f) * above
     val bottom = 1f + (((HiddenRowsShown - slot) / 2f).coerceIn(0f, 1f) - 1f) * below
     return minOf(top, bottom)
@@ -253,15 +260,21 @@ private fun folderFade(rect: UiRect): Float {
 }
 
 private fun scrollFade(layout: MenuLayout, rect: UiRect, scroll: Float, count: Int): Float =
-    if (layout == MenuLayout.HiddenList) hiddenFade(rect, scroll, count) else folderFade(rect)
+    when (layout) {
+        MenuLayout.HiddenList -> hiddenFade(rect, scroll, count)
+        MenuLayout.Settings -> hiddenFade(rect, scroll, count, SettingsFirstY, SettingsPitch)
+        else -> folderFade(rect)
+    }
 
 /** The layouts whose list scrolls (and fades at its ends). */
-private val MenuLayout.scrolls: Boolean get() = this == MenuLayout.Folders || this == MenuLayout.HiddenList
+private val MenuLayout.scrolls: Boolean get() = this == MenuLayout.Folders || this == MenuLayout.HiddenList || this == MenuLayout.Settings
 
 private fun folderScrollFor(layout: MenuLayout, count: Int, selected: Int): Float =
     if (layout == MenuLayout.HiddenList) {
         // The selected row stays in the middle of the five, except near the ends of the list.
         (selected - HiddenRowsShown / 2).coerceIn(0, maxOf(count - HiddenRowsShown, 0)) * HiddenPitch
+    } else if (layout == MenuLayout.Settings) {
+        (selected - SettingsRowsShown / 2).coerceIn(0, maxOf(count - SettingsRowsShown, 0)) * SettingsPitch
     } else if (layout.scrolls && count > FolderRowsShown) maxOf(FolderFirstY + selected * FolderPitch + FolderRowHeight / 2f - FolderCenterY, 0f) else 0f
 
 /**
@@ -592,9 +605,10 @@ private fun EntryPage(
         }
 
         if (layout.scrolls && entries.size > FolderRowsShown) {
-            val trackHeight = if (layout == MenuLayout.HiddenList) HiddenTrackHeight else 125f
+            val trackHeight = if (layout == MenuLayout.Folders) 125f else HiddenTrackHeight
+            val trackCenter = if (layout == MenuLayout.Settings) PagedCenterY else SubCenterY
             val fraction = selected.coerceIn(0, entries.lastIndex) / (entries.size - 1).toFloat()
-            ScrollSlider(1585f, SubCenterY - trackHeight / 2f, trackHeight, fraction, onSeek = onSeekList)
+            ScrollSlider(1585f, trackCenter - trackHeight / 2f, trackHeight, fraction, onSeek = onSeekList)
         }
     }
 }
