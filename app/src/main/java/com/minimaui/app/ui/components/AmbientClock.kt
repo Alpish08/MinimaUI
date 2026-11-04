@@ -9,11 +9,13 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -76,7 +78,26 @@ fun AmbientClock(visible: Boolean, fade: Animatable<Float, AnimationVector1D>, m
     if (!shown) return
 
     var minuteOfDay by remember { mutableIntStateOf(currentMinuteOfDay()) }
-    LaunchedEffect(visible) {
+    // The sleep below does not tick while the device is asleep, so the time is read again whenever the screen comes back on (or
+    // the clock or time zone is changed), and the wait for the next minute starts over from there.
+    var restart by remember { mutableIntStateOf(0) }
+    val context = LocalContext.current
+    DisposableEffect(context) {
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+                minuteOfDay = currentMinuteOfDay()
+                restart++
+            }
+        }
+        val filter = android.content.IntentFilter().apply {
+            addAction(android.content.Intent.ACTION_SCREEN_ON)
+            addAction(android.content.Intent.ACTION_TIME_CHANGED)
+            addAction(android.content.Intent.ACTION_TIMEZONE_CHANGED)
+        }
+        androidx.core.content.ContextCompat.registerReceiver(context, receiver, filter, androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
+        onDispose { context.unregisterReceiver(receiver) }
+    }
+    LaunchedEffect(visible, restart) {
         while (visible) {
             minuteOfDay = currentMinuteOfDay()
             // Sleep until the next minute starts.

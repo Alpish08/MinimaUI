@@ -78,7 +78,22 @@ private fun Modifier.fadeTowardScreenEdge(amount: () -> Float): Modifier = this
 @Composable
 fun StatusPill(modifier: Modifier = Modifier, docked: () -> Float = { 0f }) {
     val context = LocalContext.current
-    val now by produceState(initialValue = Date()) {
+    // The wait below does not tick while the device sleeps, so the time is read again (and the wait restarted) whenever the screen
+    // turns on or the clock or time zone changes.
+    var restart by remember { mutableIntStateOf(0) }
+    DisposableEffect(context) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) { restart++ }
+        }
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_TIME_CHANGED)
+            addAction(Intent.ACTION_TIMEZONE_CHANGED)
+        }
+        ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        onDispose { context.unregisterReceiver(receiver) }
+    }
+    val now by produceState(initialValue = Date(), restart) {
         while (true) {
             val nowMillis = System.currentTimeMillis()
             value = Date(nowMillis)
