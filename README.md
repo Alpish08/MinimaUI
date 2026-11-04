@@ -141,6 +141,9 @@ The first time you run MinimaUI the XMB wave is on, in the author's own look. Ch
 # Feedback
 Bugs, ideas, or an emulator or platform you'd like to see: open an [issue](../../issues). MinimaUI is a personal project, so I don't take code contributions; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
+# Credits
+* The custom boot animation: idea and first prototype by [Yexclsv25](https://github.com/Yexclsv25).
+
 # License
 MinimaUI is **source-available** under the **PolyForm Strict License 1.0.0**. The code is public so you can see exactly what the app does (it needs *All files access*, and has no network features), and you can use it for any noncommercial purpose, but you may not change it, distribute it or make new works based on it. See [LICENSE](LICENSE).
 
