@@ -225,15 +225,19 @@ private fun AppsPage(
         gone
     }
     Box(modifier = Modifier.fillMaxSize()) {
-        val covers = slots.indices.map { i ->
-            rememberCover(apps.getOrNull(page * slots.size + i)?.coverUri, IconSize.toInt())
-        }
         val focusedApp = apps.getOrNull(page * slots.size + focusedSlot)
         // Empty "+" slots (Edit Mode only) get the ring when focused too, and the plain menu-style glow and solid ring: there is no cover to match.
         val focusRect = slots.getOrNull(focusedSlot)?.takeIf { focusedApp != null || editMode }?.let {
             GlowRect(it.x.value, it.y.value, it.width.value, it.height.value, it.width.value / 2f)
         }
         val glowIn = { cascade(arrival(), focusedSlot) }
+        // The focus ring waits until every icon has settled in (and then comes in quickly).
+        val ringIn = remember { androidx.compose.animation.core.Animatable(if (arrival() >= 1f) 1f else 0f) }
+        LaunchedEffect(Unit) {
+            androidx.compose.runtime.snapshotFlow { arrival() >= 1f }.collect { settled ->
+                if (settled) ringIn.animateTo(1f, tween(180)) else ringIn.snapTo(0f)
+            }
+        }
         SelectionGlow(focusRect.takeIf { focusedApp != null }, intensity = glowIn, alpha = AppGlowAlpha)
         SelectionGlow(focusRect.takeIf { focusedApp != null }, intensity = glowIn, alpha = 0.3f, inflate = 40f)
         SelectionGlow(focusRect.takeIf { focusedApp == null })
@@ -245,7 +249,9 @@ private fun AppsPage(
                 val x by animateFloatAsState(s.x.value, glide, label = "iconX")
                 val y by animateFloatAsState(s.y.value, glide, label = "iconY")
                 if (app != null) {
-                    AppIcon(app, covers[i], x, y, i, arrival, focused = focused, editMode = editMode, held = held && focused, pressTick = pressTick, backdrop = backdrop)
+                    // The cover belongs to the app (not to the slot), so a moved icon never shows another one's picture for a moment.
+                    val cover = rememberCover(app.coverUri, IconSize.toInt())
+                    AppIcon(app, cover, x, y, i, arrival, focused = focused, editMode = editMode, held = held && focused, pressTick = pressTick, backdrop = backdrop)
                 } else {
                     EmptySlot(x, y, editMode = editMode)
                 }
@@ -265,7 +271,7 @@ private fun AppsPage(
         val press = rememberPressScale(pressTick, true)
         // The same white-to-transparent, outside-in outline as the XMB covers; it also marks the focus in Edit Mode
         // and on an empty "+" slot.
-        FocusRing(focusRect, color = Color.White, intensity = glowIn, scale = { ringScale * press.value }, fadeDepth = AppOutlineDepth)
+        FocusRing(focusRect, color = Color.White, intensity = { glowIn() * ringIn.value }, scale = { ringScale * press.value }, fadeDepth = AppOutlineDepth)
     }
 }
 

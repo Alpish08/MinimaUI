@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">MinimaUI</string>
-    <string name="level_overlay_description">Shows the volume and brightness bars over games and apps when the system changes them.</string>
+    <string name="level_overlay_description">Shows the volume and brightness bars over games and apps when the system changes them. Also watches the Home button (and only that key) so that holding it for 5 seconds restarts MinimaUI.</string>
     <string name="error_rom_folder">Couldn\'t add that folder. Please choose a subfolder.</string>
     <string name="backup_needs_access">Allow \"All files access\" for MinimaUI, then try the backup again.</string>
     <string name="backup_saved">Backup saved: %1$s</string>

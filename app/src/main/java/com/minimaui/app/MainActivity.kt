@@ -48,6 +48,9 @@ import com.minimaui.app.ui.home.HomeActions
 import com.minimaui.app.ui.home.HomeRoot
 import com.minimaui.app.ui.theme.MinimaUITheme
 
+/** Set on an intent that asks for a fresh start (the Home button held for a while, see LevelOverlayService). */
+const val EXTRA_RESTART = "restart"
+
 class MainActivity : ComponentActivity() {
     private val store by lazy { LibraryStore(applicationContext) }
     private val library by lazy { Library(PlatformCatalog.platforms, store) }
@@ -122,9 +125,12 @@ class MainActivity : ComponentActivity() {
         refreshIcons()
         // If the system closed MinimaUI while a game or app was running, coming back is a return, not a fresh start:
         // no boot logo then.
-        cameBackFromLaunch = store.loadString(KEY_LAUNCHED_AT)?.toLongOrNull()
+        val restarting = intent?.getBooleanExtra(EXTRA_RESTART, false) == true
+        cameBackFromLaunch = !restarting && store.loadString(KEY_LAUNCHED_AT)?.toLongOrNull()
             ?.let { System.currentTimeMillis() - it < 12 * 60 * 60 * 1000L } == true
         store.saveString(KEY_LAUNCHED_AT, null)
+        // The menu music waits for the boot video (if there is one) from the first moment.
+        bootVideoPlaying.value = (restarting || !bootPlayed) && !cameBackFromLaunch && settings.bootVideoUri != null
         val launcher = GameLauncher(this)
         val actions = HomeActions(
             pickRomFolder = { suppressHomeSound = true; romFolderPicker.launch(null) },
@@ -251,6 +257,17 @@ class MainActivity : ComponentActivity() {
         store.saveList("iconsVersion", listOf("2"))
     }
 
+    /** A fresh start of the home screen: the boot animation plays again. */
+    private fun restartHome() {
+        bootPlayed = false
+        recreate()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_RESTART, false)) restartHome()
+    }
+
     override fun onStart() {
         super.onStart()
         bgm.setForeground(true)
@@ -259,6 +276,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         com.minimaui.app.overlay.LevelOverlayService.homeActive = true
+        com.minimaui.app.overlay.LevelOverlayService.onRestartRequested = ::restartHome
         // Coming back (screen on, or from another app): ask again for the fast mode, going through "no preference" first so
         // the window manager really applies it after a dimmed, 60 Hz stay.
         applyRefreshRate()
@@ -357,6 +375,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         com.minimaui.app.overlay.LevelOverlayService.homeActive = false
+        com.minimaui.app.overlay.LevelOverlayService.onRestartRequested = null
         dimHandler.removeCallbacks(refreshCheck)
         dimHandler.removeCallbacks(dimRunnable)
         dimHandler.removeCallbacks(idleRunnable)

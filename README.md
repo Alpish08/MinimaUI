@@ -121,7 +121,7 @@ Sounds are not included. If you want a PS Vita feel, the community-made [PS Vita
 The first time you run MinimaUI the XMB wave is on, in the author's own look. Change it in *Start → Customization → XMB Wave* (OFF, ON = the original wave, CUSTOM = the MinimaUI ribbon). With CUSTOM selected you can randomize it (**X**) and save the current look (**Y**) as a file in `MinimaUI/Backup/Custom Wave/`; restore one from *Backup / Restore*. The files are plain `key = value` text, so you can also tune them by hand.
 
 # Optional extras
-* **Volume and brightness bars** over other apps: MinimaUI has an accessibility service for this (Android Settings → Accessibility → MinimaUI). It's off until you enable it, and nothing else needs it.
+* **Volume and brightness bars** over other apps: MinimaUI has an accessibility service for this (Android Settings → Accessibility → MinimaUI). It's off until you enable it, and nothing else needs it. The same service also watches the Home button (that one key only, nothing else you press) so that **holding Home for 5 seconds restarts MinimaUI**, which replays the boot animation.
 * **[ui-overlay](ui-overlay)**: a Magisk module that gives Android's own quick settings, notifications and power menu MinimaUI's soft fading outline. Only for rooted devices, and entirely optional. See its README.
 
 <p>

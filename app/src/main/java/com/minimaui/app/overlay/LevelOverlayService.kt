@@ -13,6 +13,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.WindowManager
 import android.view.animation.PathInterpolator
 import android.view.accessibility.AccessibilityEvent
@@ -61,6 +62,30 @@ class LevelOverlayService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
+
+    private val restart = Runnable {
+        // MinimaUI in front restarts itself; from anywhere else, it is brought up and told to start fresh.
+        onRestartRequested?.invoke() ?: startActivity(
+            Intent(Intent.ACTION_MAIN)
+                .addCategory(Intent.CATEGORY_HOME)
+                .setClassName(packageName, "com.minimaui.app.MainActivity")
+                .putExtra(com.minimaui.app.EXTRA_RESTART, true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        )
+    }
+
+    /** The RP6's Home button (scan code 102) arrives as MOVE_HOME; held for [RESTART_HOLD_MS] it restarts MinimaUI. The key is never consumed. */
+    override fun onKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_MOVE_HOME) {
+            if (event.action == KeyEvent.ACTION_UP) {
+                handler.removeCallbacks(restart)
+            } else if (event.repeatCount == 0) {
+                handler.removeCallbacks(restart)
+                handler.postDelayed(restart, RESTART_HOLD_MS)
+            }
+        }
+        return false
+    }
 
     override fun onInterrupt() = Unit
 
@@ -131,5 +156,11 @@ class LevelOverlayService : AccessibilityService() {
         /** True while MinimaUI is in front, which draws the bars itself. */
         @Volatile
         var homeActive = false
+
+        /** Set by MinimaUI while it is in front: what holding the Home button does there. */
+        @Volatile
+        var onRestartRequested: (() -> Unit)? = null
+
+        private const val RESTART_HOLD_MS = 5_000L
     }
 }

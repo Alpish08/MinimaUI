@@ -453,7 +453,8 @@ fun MenuOverlay(
                             entries = if (settled) (if (here) entries else entriesFor(p)) else lastShown.pages[p],
                             selected = if (!here) -1 else if (settled) selected else lastShown.selected,
                             focused = here && focus == MenuFocus.Actions && settled,
-                            paged = pages > 1,
+                            // The entries leaving while the category changes keep their own (old) layout.
+                            paged = (if (settled) pages else lastShown.pages.size) > 1,
                             onSeekVolume = onSeekVolume,
                             onSeekList = onSeekList,
                         )

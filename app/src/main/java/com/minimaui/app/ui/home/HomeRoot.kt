@@ -788,7 +788,7 @@ fun HomeRoot(
 
         if (boot.value < 1f) BootLogo(progress = boot.value, appear = bootAppear.value)
 
-        // Any button or a tap skips the video.
+        // A button press skips the video (touch does not, and is not passed on to the screen under it).
         if (bootVideo != null && videoPhase != BootVideoPhase.Gone) {
             BootVideo(
                 uri = bootVideo,
@@ -800,7 +800,7 @@ fun HomeRoot(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer { alpha = videoAlpha.value }
-                    .pointerInput(Unit) { detectTapGestures { if (videoPhase == BootVideoPhase.Playing) videoPhase = BootVideoPhase.Finished } }
+                    .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent().changes.forEach { it.consume() } } }
             )
         }
 
