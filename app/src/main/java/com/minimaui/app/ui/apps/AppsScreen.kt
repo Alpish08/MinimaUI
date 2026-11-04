@@ -230,17 +230,17 @@ private fun AppsPage(
         val focusRect = slots.getOrNull(focusedSlot)?.takeIf { focusedApp != null || editMode }?.let {
             GlowRect(it.x.value, it.y.value, it.width.value, it.height.value, it.width.value / 2f)
         }
-        val glowIn = { cascade(arrival(), focusedSlot) }
-        // The focus ring waits until every icon has settled in (and then comes in quickly).
+        // The glow and the focus ring wait until every icon has settled in, then fade in together.
         val ringIn = remember { androidx.compose.animation.core.Animatable(if (arrival() >= 1f) 1f else 0f) }
         LaunchedEffect(Unit) {
             androidx.compose.runtime.snapshotFlow { arrival() >= 1f }.collect { settled ->
-                if (settled) ringIn.animateTo(1f, tween(180)) else ringIn.snapTo(0f)
+                if (settled) ringIn.animateTo(1f, tween(260)) else ringIn.snapTo(0f)
             }
         }
+        val glowIn = { ringIn.value }
         SelectionGlow(focusRect.takeIf { focusedApp != null }, intensity = glowIn, alpha = AppGlowAlpha)
         SelectionGlow(focusRect.takeIf { focusedApp != null }, intensity = glowIn, alpha = 0.3f, inflate = 40f)
-        SelectionGlow(focusRect.takeIf { focusedApp == null })
+        SelectionGlow(focusRect.takeIf { focusedApp == null }, intensity = glowIn)
         slots.forEachIndexed { i, s ->
             val app = apps.getOrNull(page * slots.size + i)
             val focused = i == focusedSlot
@@ -271,7 +271,7 @@ private fun AppsPage(
         val press = rememberPressScale(pressTick, true)
         // The same white-to-transparent, outside-in outline as the XMB covers; it also marks the focus in Edit Mode
         // and on an empty "+" slot.
-        FocusRing(focusRect, color = Color.White, intensity = { glowIn() * ringIn.value }, scale = { ringScale * press.value }, fadeDepth = AppOutlineDepth)
+        FocusRing(focusRect, color = Color.White, intensity = glowIn, scale = { ringScale * press.value }, fadeDepth = AppOutlineDepth)
     }
 }
 
