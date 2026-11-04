@@ -16,6 +16,8 @@ class Settings(platforms: List<Platform>, private val store: LibraryStore) {
     var ambientClock by mutableStateOf(store.loadFlag(KEY_AMBIENT_CLOCK, true))
         private set
     var backgroundMusic by mutableStateOf(store.loadFlag(KEY_BACKGROUND_MUSIC, true))
+    /** With the music on: false repeats the picked track, true shuffles the files in MinimaUI/Music. */
+    var shuffleMusic by mutableStateOf(store.loadFlag(KEY_SHUFFLE_MUSIC, false))
         private set
 
     /** The animated wave behind the All Games and Apps pages: 0 off, 1 the original wave (ON), 2 the Minima ribbon (CUSTOM, see [WaveConfig]). */
@@ -170,9 +172,15 @@ class Settings(platforms: List<Platform>, private val store: LibraryStore) {
         store.saveFlag(KEY_MENU_SOUNDS, menuSounds)
     }
 
-    fun toggleBackgroundMusic() {
-        backgroundMusic = !backgroundMusic
+    /** ON (repeat the picked track) -> SHUFFLE (the files in MinimaUI/Music) -> OFF -> ON. */
+    fun cycleBackgroundMusic() {
+        when {
+            backgroundMusic && !shuffleMusic -> shuffleMusic = true
+            backgroundMusic -> { backgroundMusic = false; shuffleMusic = false }
+            else -> backgroundMusic = true
+        }
         store.saveFlag(KEY_BACKGROUND_MUSIC, backgroundMusic)
+        store.saveFlag(KEY_SHUFFLE_MUSIC, shuffleMusic)
     }
 
     companion object {
@@ -186,6 +194,7 @@ class Settings(platforms: List<Platform>, private val store: LibraryStore) {
         private const val KEY_MENU_SOUNDS = "menuSounds"
         private const val KEY_AMBIENT_CLOCK = "ambientClock"
         private const val KEY_BACKGROUND_MUSIC = "backgroundMusic"
+        private const val KEY_SHUFFLE_MUSIC = "shuffleMusic"
         private const val KEY_ROM_FOLDERS = "romFolders"
         private const val KEY_BGM_URI = "customBgm"
         private const val KEY_BOOT_VIDEO = "bootVideo"

@@ -95,7 +95,7 @@ MinimaUI creates these folders on internal storage (`/sdcard/MinimaUI/`) itself 
 MinimaUI/
   Backup/            settings backups (and Custom Wave/ for saved wave looks)
   GameID/            gamehub_games.txt  ->  one game per line: Title | id   (edit it by hand if you like)
-  Music/             your own background music; pick it in Customization
+  Music/             your own background music; pick a track in Customization, or set Background Music to SHUFFLE to play every file in here
   Sounds/            your own UI sounds (see below)
   Cover Art/         put your covers here and pick them from the menus
     Favorites/

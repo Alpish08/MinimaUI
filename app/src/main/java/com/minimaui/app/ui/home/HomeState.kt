@@ -860,7 +860,7 @@ class HomeState(
             )
             1 -> listOf(
                 MenuEntry("Menu Sounds [${onOff(settings.menuSounds)}]"),
-                MenuEntry("Background Music [${onOff(settings.backgroundMusic)}]"),
+                MenuEntry("Background Music [${if (!settings.backgroundMusic) "OFF" else if (settings.shuffleMusic) "SHUFFLE" else "ON"}]"),
                 MenuEntry("Pick Menu BGM…"),
                 MenuEntry("Volume", slider = settings.volume),
             )
@@ -1675,7 +1675,7 @@ class HomeState(
                 }
                 AudioPage -> when (menuAction) {
                     0 -> settings.toggleMenuSounds()
-                    1 -> settings.toggleBackgroundMusic()
+                    1 -> settings.cycleBackgroundMusic()
                     2 -> actions.pickBackgroundMusic()
                 }
                 else -> menuPlatforms.getOrNull(menuAction)?.let { settings.setPlatformEnabled(it.id, !settings.isPlatformEnabled(it.id)) }

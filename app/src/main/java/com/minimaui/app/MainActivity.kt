@@ -194,8 +194,8 @@ class MainActivity : ComponentActivity() {
             // UI Smoothness: 60 or 120 Hz display mode.
             LaunchedEffect(settings.uiFps) { applyRefreshRate() }
             // The music waits while the boot video plays (it has its own sound).
-            LaunchedEffect(settings.backgroundMusic, settings.customBgmUri, bootVideoPlaying.value) {
-                bgm.update(settings.backgroundMusic && !bootVideoPlaying.value, settings.customBgmUri)
+            LaunchedEffect(settings.backgroundMusic, settings.shuffleMusic, settings.customBgmUri, bootVideoPlaying.value) {
+                bgm.update(settings.backgroundMusic && !bootVideoPlaying.value, settings.customBgmUri, settings.shuffleMusic)
             }
             // The ROM folders are walked only when there is no saved scan for them (first launch), when one is added or
             // removed, and on a manual rescan. Everything else (returning to the app, adding an app game) just rebuilds
