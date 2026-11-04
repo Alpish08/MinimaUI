@@ -230,17 +230,26 @@ private fun AppsPage(
         val focusRect = slots.getOrNull(focusedSlot)?.takeIf { focusedApp != null || editMode }?.let {
             GlowRect(it.x.value, it.y.value, it.width.value, it.height.value, it.width.value / 2f)
         }
-        // The glow and the focus ring wait until every icon has settled in, then fade in together.
-        val ringIn = remember { androidx.compose.animation.core.Animatable(if (arrival() >= 1f) 1f else 0f) }
-        LaunchedEffect(Unit) {
-            androidx.compose.runtime.snapshotFlow { arrival() >= 1f }.collect { settled ->
-                if (settled) ringIn.animateTo(1f, tween(260)) else ringIn.snapTo(0f)
+        // While the screen comes in, the glow and the ring ride along with the focused icon: they fade in, rise and grow as it does.
+        val glowIn = { if (focusedApp != null) cascade(arrival(), focusedSlot) else 1f }
+        val withIcon = Modifier.fillMaxSize().graphicsLayer {
+            val settled = glowIn()
+            translationY = (1f - settled) * ArrivalRise.dp.toPx()
+            val s = 0.9f + 0.1f * settled
+            scaleX = s
+            scaleY = s
+            if (focusRect != null) {
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(
+                    (focusRect.x + focusRect.width / 2f).dp.toPx() / size.width,
+                    (focusRect.y + focusRect.height / 2f).dp.toPx() / size.height
+                )
             }
         }
-        val glowIn = { ringIn.value }
-        SelectionGlow(focusRect.takeIf { focusedApp != null }, intensity = glowIn, alpha = AppGlowAlpha)
-        SelectionGlow(focusRect.takeIf { focusedApp != null }, intensity = glowIn, alpha = 0.3f, inflate = 40f)
-        SelectionGlow(focusRect.takeIf { focusedApp == null }, intensity = glowIn)
+        Box(withIcon) {
+            SelectionGlow(focusRect.takeIf { focusedApp != null }, intensity = glowIn, alpha = AppGlowAlpha)
+            SelectionGlow(focusRect.takeIf { focusedApp != null }, intensity = glowIn, alpha = 0.3f, inflate = 40f)
+        }
+        SelectionGlow(focusRect.takeIf { focusedApp == null })
         slots.forEachIndexed { i, s ->
             val app = apps.getOrNull(page * slots.size + i)
             val focused = i == focusedSlot
@@ -271,7 +280,9 @@ private fun AppsPage(
         val press = rememberPressScale(pressTick, true)
         // The same white-to-transparent, outside-in outline as the XMB covers; it also marks the focus in Edit Mode
         // and on an empty "+" slot.
-        FocusRing(focusRect, color = Color.White, intensity = glowIn, scale = { ringScale * press.value }, fadeDepth = AppOutlineDepth)
+        Box(withIcon) {
+            FocusRing(focusRect, color = Color.White, intensity = glowIn, scale = { ringScale * press.value }, fadeDepth = AppOutlineDepth)
+        }
     }
 }
 
