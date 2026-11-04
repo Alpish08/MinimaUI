@@ -180,6 +180,7 @@ fun HomeRoot(
     state.keySound = { if (settings.menuSounds) uiSounds.play(Sfx.Keyboard) }
     state.switchSound = { if (settings.menuSounds) uiSounds.play(Sfx.ModeSwitch) }
     state.toastSound = { if (settings.menuSounds) uiSounds.play(Sfx.Toast) }
+    state.errorSound = { if (settings.menuSounds) uiSounds.play(Sfx.Error) }
 
     // The right stick turns pages: each push past the threshold counts once, and it must return to centre to count again.
     DisposableEffect(view, state) {

@@ -310,6 +310,7 @@ class MainActivity : ComponentActivity() {
         bgm.fadeOut()
         window.decorView.postDelayed({
             if (!start()) {
+                if (settings.menuSounds) uiSounds.play(Sfx.Error)
                 store.saveString(KEY_LAUNCHED_AT, null)
                 launching.value = false
                 bgm.fadeIn()
@@ -521,7 +522,7 @@ class MainActivity : ComponentActivity() {
     private fun addRomFolder(uri: Uri) {
         val documentId = runCatching { DocumentsContract.getTreeDocumentId(uri) }.getOrNull()
         if (documentId == null || documentId.endsWith(":")) {
-            toast(R.string.error_rom_folder)
+            errorToast(R.string.error_rom_folder)
             return
         }
         contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -531,7 +532,7 @@ class MainActivity : ComponentActivity() {
     /** True when backups can be written; otherwise asks for "All files access" and says so. */
     private fun hasBackupAccess(): Boolean {
         if (backups.hasStorageAccess()) return true
-        toast(R.string.backup_needs_access)
+        errorToast(R.string.backup_needs_access)
         suppressHomeSound = true
         startActivity(
             Intent(
@@ -546,14 +547,14 @@ class MainActivity : ComponentActivity() {
         if (!hasBackupAccess()) return
         backups.saveWave(settings.wave)
             .onSuccess { Toast.makeText(this, getString(R.string.wave_saved, it.name), Toast.LENGTH_LONG).show() }
-            .onFailure { toast(R.string.backup_failed) }
+            .onFailure { errorToast(R.string.backup_failed) }
     }
 
     private fun createBackup() {
         if (!hasBackupAccess()) return
         backups.createBackup()
             .onSuccess { Toast.makeText(this, getString(R.string.backup_saved, it.name), Toast.LENGTH_LONG).show() }
-            .onFailure { toast(R.string.backup_failed) }
+            .onFailure { errorToast(R.string.backup_failed) }
     }
 
     private fun restoreBackup(uri: Uri) {
@@ -568,10 +569,16 @@ class MainActivity : ComponentActivity() {
                     recreate()
                 }
             }
-            .onFailure { toast(R.string.restore_failed) }
+            .onFailure { errorToast(R.string.restore_failed) }
     }
 
     private fun toast(resId: Int) = Toast.makeText(this, resId, Toast.LENGTH_LONG).show()
+
+    /** A toast for something that went wrong, with the error sound. */
+    private fun errorToast(resId: Int) {
+        if (settings.menuSounds) uiSounds.play(Sfx.Error)
+        toast(resId)
+    }
 
     /**
      * Asks for the display's fastest mode at the current resolution (120 Hz on a Retroid Pocket 6), so the system's

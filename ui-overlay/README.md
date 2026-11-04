@@ -43,6 +43,14 @@ those two turned light). That file needs the private attribute names, so the Sys
 4. `service.sh` enables both overlays after boot and puts them above Iconify's styles. Check with
    `adb shell cmd overlay list | grep minimaui` (`[x]` means on).
 
+## Your own screenshot sound (optional)
+Put `screenshot.wav` (or `.ogg`, `.mp3`, `.m4a`) in `MinimaUI/Sounds/` on the device before `./build.sh`. The script pulls it, converts it to
+Ogg Vorbis and puts it where Android keeps its shutter click (`camera_click.ogg`, the sound a screenshot plays; `/product` and `/system`, wherever
+the device has the file), so the module replaces it systemlessly. Or point `SCREENSHOT_SOUND=/path/to/file` at a file on the Mac. Without a file,
+the module is built as before. The sound only goes into the zip in `build/`, never into the repository. The real camera's shutter uses the same
+sound, so it changes too. If the screenshot still makes the old sound, the firmware plays its own: check with
+`adb shell find / -name "camera_click*" 2>/dev/null`.
+
 ## Undo
 * Magisk, Modules, switch the module off (or remove it), reboot. If SystemUI misbehaves, boot Magisk safe mode (modules off) and remove it.
 * To try without it for one boot: `su -c "cmd overlay disable com.minimaui.overlay.systemui"` (it comes back at the next boot).

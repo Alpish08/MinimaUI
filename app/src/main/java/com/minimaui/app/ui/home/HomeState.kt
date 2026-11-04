@@ -122,6 +122,7 @@ class HomeState(
     var keySound: () -> Unit = {}
     /** A toast appears. */
     var toastSound: () -> Unit = {}
+    var errorSound: () -> Unit = {}
     /** Switching the keyboard between the letters and the number pad. */
     var switchSound: () -> Unit = {}
     /** Edit Mode is entered. */
@@ -150,10 +151,10 @@ class HomeState(
     var toastStamp by mutableIntStateOf(0)
         private set
 
-    private fun showToast(text: String) {
+    private fun showToast(text: String, error: Boolean = false) {
         toastText = text
         toastStamp++
-        toastSound()
+        if (error) errorSound() else toastSound()
     }
 
     /** The manual rescan has finished; [added] is how many more games the library shows than before it. */
@@ -1703,7 +1704,7 @@ class HomeState(
     /** Edit Mode, from the Customization menu: not offered in the Recently Played view (nothing there can be arranged). */
     private fun toggleEditModeFromMenu() {
         if (screen == HomeScreen.Favorites && favView == FavView.Recent) {
-            showToast("Edit Mode isn't available here")
+            showToast("Edit Mode isn't available here", error = true)
             return
         }
         changeEditMode(!editMode)

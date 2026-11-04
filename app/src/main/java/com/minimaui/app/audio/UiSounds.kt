@@ -19,6 +19,8 @@ enum class Sfx(val file: String, val fallback: Sfx? = null, val optional: Boolea
     Menu("menu", fallback = MenuNavigate),
     /** Pushing against the end of a page, list or menu (switched off for now: see EdgeSoundOn in HomeRoot). */
     Edge("edge", optional = true),
+    /** Something went wrong: a game that won't launch, a failed backup or restore. Silent without the file. */
+    Error("error", optional = true),
     /** Entering Edit Mode. */
     EditMode("edit_mode", optional = true),
     PageSwitch("page_switch"),

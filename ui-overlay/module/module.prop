@@ -1,6 +1,6 @@
 id=minimaui_ui_outlines
 name=MinimaUI Outlines for Android
-version=v2.0
-versionCode=2
+version=v2.1
+versionCode=3
 author=MinimaUI
 description=MinimaUI's soft fading outline on Android's own UI: quick settings tiles and footer, notifications, brightness bar, power menu, volume panel, toasts.

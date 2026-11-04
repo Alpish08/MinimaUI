@@ -23,5 +23,34 @@ build_overlay android MinimaUIOutlinesAndroid.apk
 cp -R module/. build/stage/
 mkdir -p build/stage/system/product/overlay
 cp build/MinimaUIOutlinesSystemUI.apk build/MinimaUIOutlinesAndroid.apk build/stage/system/product/overlay/
+# Optional: your own screenshot sound replaces Android's shutter click (the screenshot sound is the camera click). It is taken from
+# MinimaUI/Sounds/screenshot.(wav|ogg|mp3|m4a) on the device, or from the file named in SCREENSHOT_SOUND, and only ends up in the zip
+# under build/ (never in the repository: the sound is yours).
+SND="${SCREENSHOT_SOUND:-}"
+if [ -z "$SND" ]; then
+  for ext in wav ogg mp3 m4a; do
+    if adb shell "[ -f /sdcard/MinimaUI/Sounds/screenshot.$ext ]" 2>/dev/null; then
+      adb pull "/sdcard/MinimaUI/Sounds/screenshot.$ext" ".cache/screenshot.$ext" >/dev/null && SND=".cache/screenshot.$ext" && break
+    fi
+  done
+fi
+if [ -n "$SND" ]; then
+  # Vorbis in Ogg, 44.1 kHz stereo, which every Android version plays; the shutter sound is short.
+  ffmpeg -y -loglevel error -i "$SND" -ar 44100 -ac 2 -c:a vorbis -strict -2 -b:a 160k .cache/camera_click.ogg
+  # MediaActionSound looks in /product/media/audio/ui first, then /system/media/audio/ui: replace the file wherever the device has it
+  # (both when the RP6 isn't connected).
+  PLACES=""
+  for dir in system product system_ext; do
+    if adb shell "[ -f /$dir/media/audio/ui/camera_click.ogg ]" 2>/dev/null; then PLACES="$PLACES $dir"; fi
+  done
+  [ -n "$PLACES" ] || PLACES="system product"
+  for dir in $PLACES; do
+    if [ "$dir" = system ]; then target=build/stage/system/media/audio/ui; else target=build/stage/system/$dir/media/audio/ui; fi
+    mkdir -p "$target" && cp .cache/camera_click.ogg "$target/camera_click.ogg"
+  done
+  echo "screenshot sound: $SND replaces the camera click in:$PLACES"
+else
+  echo "no screenshot sound found (put screenshot.wav in MinimaUI/Sounds/ on the device, or set SCREENSHOT_SOUND)"
+fi
 (cd build/stage && zip -q -r ../MinimaUI-Outlines-Magisk.zip . -x '.DS_Store')
 echo "built build/MinimaUI-Outlines-Magisk.zip"
