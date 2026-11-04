@@ -24,7 +24,7 @@ No -
 * RetroAchievements support,
 * Background processes.
 
-When nothing has been touched for 30 seconds the focus glow and the scrolling titles stop, the wave stops, the screen dims to 60 Hz and an analog clock fades in; the first button press only wakes it.
+When nothing has been touched for 30 seconds the focus glow and the scrolling titles stop, the wave stops, the screen dims to 60 Hz and an analog clock fades in (with the Idle Clock turned off it just dims, to 20% of your brightness instead of 40%); the first button press only wakes it.
 
 # Features
 * **Favorites**: a bento of your favorite games and apps, with folders and a recently played view.

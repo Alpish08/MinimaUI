@@ -352,6 +352,8 @@ class MainActivity : ComponentActivity() {
         const val IDLE_DIM_MS = 30_000L
         const val IDLE_FREEZE_MS = 30_000L
         const val DIM_FRACTION = 0.4f
+        /** The dimmed screen without the idle clock is darker still. */
+        const val DIM_FRACTION_NO_CLOCK = 0.2f
         const val DIM_FADE_MS = 1000L
         const val REFRESH_CHECKS = 6
         const val REFRESH_CHECK_MS = 700L
@@ -428,7 +430,7 @@ class MainActivity : ComponentActivity() {
         dimAnimator?.cancel()
         val attributes = window.attributes
         val system = android.provider.Settings.System.getInt(contentResolver, android.provider.Settings.System.SCREEN_BRIGHTNESS, 128) / 255f
-        val dimLevel = (system * DIM_FRACTION).coerceAtLeast(0.02f)
+        val dimLevel = (system * (if (settings.ambientClock) DIM_FRACTION else DIM_FRACTION_NO_CLOCK)).coerceAtLeast(0.02f)
         // Dimmed means idle: ask for the display's 60 Hz mode (the app also draws at half of that).
         modeFor(if (on) 60f else Float.MAX_VALUE)?.let { attributes.preferredDisplayModeId = it }
         window.attributes = attributes
