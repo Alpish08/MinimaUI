@@ -176,7 +176,7 @@ fun HomeRoot(
     state.confirmSound = { if (settings.menuSounds) uiSounds.play(Sfx.CancelConfirm) }
     state.menuSound = { if (settings.menuSounds) uiSounds.play(Sfx.Menu) }
     state.editModeSound = { if (settings.menuSounds) uiSounds.play(Sfx.EditMode) }
-    state.searchSound = { if (settings.menuSounds) uiSounds.play(Sfx.Search) }
+    state.searchSound = { if (settings.menuSounds) uiSounds.play(Sfx.MenuNavigate) }
     state.keySound = { if (settings.menuSounds) uiSounds.play(Sfx.Keyboard) }
     state.switchSound = { if (settings.menuSounds) uiSounds.play(Sfx.ModeSwitch) }
     state.toastSound = { if (settings.menuSounds) uiSounds.play(Sfx.Toast) }

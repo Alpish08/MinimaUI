@@ -21,8 +21,6 @@ enum class Sfx(val file: String, val fallback: Sfx? = null, val optional: Boolea
     Edge("edge", optional = true),
     /** Entering Edit Mode. */
     EditMode("edit_mode", optional = true),
-    /** Opening the search. */
-    Search("search"),
     PageSwitch("page_switch"),
     AppLaunch("app_launch"),
     GameLaunch("game_launch"),
