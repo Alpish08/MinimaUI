@@ -424,7 +424,8 @@ fun MenuOverlay(
             FocusRing(
                 categoryRect(category.ordinal).grown(if (focus == MenuFocus.Categories) CategoryGrow else 0f).toGlow(),
                 pulsing = focus == MenuFocus.Categories,
-                fadeDepth = outlineDepthFor(categoryRect(category.ordinal).height)
+                fadeDepth = outlineDepthFor(categoryRect(category.ordinal).height),
+                underStrength = UnfocusedOutline
             )
 
             // The pages, side by side in the sub-box; each has its own glow, pills and focus ring, and slides with the others.
@@ -577,7 +578,8 @@ private fun EntryPage(
             },
             fadeDepth = outlineDepthFor(
                 if (selected in entries.indices) entryRect(layout, selected, entries.size, 0f, dangerLast, paged).height else 0f
-            )
+            ),
+            underStrength = UnfocusedOutline
         )
 
         if (layout == MenuLayout.HiddenList) {
@@ -610,7 +612,6 @@ private fun MenuPill(
     alpha: Float = 1f,
 ) {
     val shape = CircleShape
-    val outline by animateFloatAsState(if (active) 0f else UnfocusedOutline, tween(200), label = "pillOutline")
     Box(
         modifier = Modifier
             .offset(rect.x.dp, rect.y.dp)
@@ -619,7 +620,7 @@ private fun MenuPill(
             .graphicsLayer { this.alpha = alpha }
             .clip(shape)
             .background(if (active) MenuPillActive else MenuPillIdle)
-            .pillOutline(outlineDepthFor(rect.height)) { outline },
+            .pillOutline(outlineDepthFor(rect.height)) { UnfocusedOutline },
         contentAlignment = Alignment.Center
     ) {
         if (dot != null) {
@@ -645,7 +646,6 @@ private fun MenuPill(
 
 @Composable
 private fun PlusPill(active: Boolean, rect: UiRect, alpha: Float = 1f) {
-    val outline by animateFloatAsState(if (active) 0f else UnfocusedOutline, tween(200), label = "plusOutline")
     Box(
         modifier = Modifier
             .offset(rect.x.dp, rect.y.dp)
@@ -654,7 +654,7 @@ private fun PlusPill(active: Boolean, rect: UiRect, alpha: Float = 1f) {
             .graphicsLayer { this.alpha = alpha }
             .clip(CircleShape)
             .background(if (active) MenuPillActive else MenuPillIdle)
-            .pillOutline(outlineDepthFor(rect.height)) { outline },
+            .pillOutline(outlineDepthFor(rect.height)) { UnfocusedOutline },
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.size((minOf(rect.width, rect.height) * 0.36f).dp)) {
@@ -679,7 +679,6 @@ private val BarTrackFill = Color(0x66000000)
 @Composable
 private fun SliderCard(title: String, value: Int, active: Boolean, rect: UiRect, onSeek: (Int) -> Unit) {
     val shape = RoundedCornerShape(60.dp)
-    val outline by animateFloatAsState(if (active) 0f else UnfocusedOutline, tween(200), label = "sliderOutline")
     val barWidth = rect.width - 86f
     Box(
         modifier = Modifier
@@ -687,7 +686,7 @@ private fun SliderCard(title: String, value: Int, active: Boolean, rect: UiRect,
             .size(rect.width.dp, rect.height.dp)
             .clip(shape)
             .background(if (active) MenuPillActive else MenuPillIdle)
-            .pillOutline(outlineDepthFor(rect.height), corner = 60.dp) { outline }
+            .pillOutline(outlineDepthFor(rect.height), corner = 60.dp) { UnfocusedOutline }
     ) {
         Text(
             text = "$title: $value%",

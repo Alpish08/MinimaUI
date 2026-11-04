@@ -158,7 +158,10 @@ fun AppPicker(
                     ) }
                 }
 
-                FocusRing(focusRect, color = Color.White, scale = { 1f + PickerGrow }, fadeDepth = AppOutlineDepth)
+                FocusRing(
+                    focusRect, color = Color.White, scale = { 1f + PickerGrow }, fadeDepth = AppOutlineDepth,
+                    underStrength = UnfocusedOutline * FocusedOutlineGain
+                )
 
                 if (rows > 1) {
                     val fraction = selectedRow / (rows - 1).toFloat()
@@ -198,7 +201,6 @@ private fun AppCell(
     focusScale: Float,
 ) {
     val scale by animateFloatAsState(focusScale, tween(200), label = "cellScale")
-    val outlineStrength by animateFloatAsState(if (active) 0f else UnfocusedOutline, tween(200), label = "cellOutline")
     val glide = tween<Float>(durationMillis = 260, easing = EaseInOut)
     val animatedRow by animateFloatAsState(row.toFloat(), glide, label = "cellRow")
     val animatedColumn by animateFloatAsState(column.toFloat(), glide, label = "cellColumn")
@@ -218,7 +220,7 @@ private fun AppCell(
             }
             .clip(CircleShape)
             .background(IconFill)
-            .softOutline(depth = AppOutlineDepth, gain = FocusedOutlineGain) { outlineStrength }
+            .softOutline(depth = AppOutlineDepth, gain = FocusedOutlineGain) { UnfocusedOutline }
     ) {
         icon?.let { Image(bitmap = it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize()) }
     }

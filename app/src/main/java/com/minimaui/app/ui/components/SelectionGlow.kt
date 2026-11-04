@@ -52,6 +52,9 @@ internal class Highlight(
     val height: State<Float>,
     val corner: State<Float>,
     val fade: State<Float>,
+    /** Where the highlight is going (its target's corner), to tell when it has arrived. */
+    val targetX: Float,
+    val targetY: Float,
 )
 
 @Composable
@@ -67,6 +70,8 @@ internal fun rememberHighlight(target: GlowRect?): Highlight {
         height = animateFloatAsState(rect.height, spec, label = "hlH"),
         corner = animateFloatAsState(rect.corner, spec, label = "hlCorner"),
         fade = animateFloatAsState(if (target != null) 1f else 0f, tween(180), label = "hlFade"),
+        targetX = rect.x,
+        targetY = rect.y,
     )
 }
 
@@ -142,6 +147,9 @@ fun SelectionGlow(
 
 private const val DitheredReach = 3.6f
 
+/** How close (design px) a gliding ring must be to its item to count as being on it. */
+private const val ArrivedWithin = 30f
+
 // The Gaussian blur of a rectangle is the product of two one-dimensional profiles (the difference of two normal CDFs); the
 // CDF uses the tanh approximation of erf (as a logistic: AGSL has no tanh). Noise of half a step is added to the alpha before it is rounded to 8 bits (the dither).
 private const val DitheredGlowAgsl = """
@@ -186,6 +194,10 @@ private fun maskFilterFor(sigma: Float): android.graphics.BlurMaskFilter {
  * inside (see [drawFadingOutline]), that glides from item to item (instead of one outline vanishing and another
  * appearing). Place it after the items it outlines, in the same Box as their [SelectionGlow]. [scale] follows
  * an item that grows when picked up or pressed.
+ *
+ * Items keep their steady gray outline even while focused (so none disappears while the ring is on its way to the next one). Give
+ * [underStrength] and [underDepth] (the outline's strength at its edge, and how far it reaches in) and the ring, once it is on its item,
+ * is drawn so that the two together look exactly like the ring alone.
  */
 @Composable
 fun FocusRing(
@@ -196,6 +208,8 @@ fun FocusRing(
     pulsing: Boolean = true,
     intensity: () -> Float = { 1f },
     scale: () -> Float = { 1f },
+    underStrength: Float = 0f,
+    underDepth: Dp = fadeDepth,
 ) {
     val pulse = LocalFocusPulse.current
     val h = rememberHighlight(target)
@@ -211,7 +225,16 @@ fun FocusRing(
             }
             .drawBehind {
                 val strength = h.fade.value * intensity().coerceIn(0f, 1f) * (if (pulsing) pulse() else 1f)
-                drawFadingOutline(h.corner.value.dp.toPx(), fadeDepth.toPx(), strength, color)
+                // The steady outline only counts once the ring has arrived on its item (on the way, it lies between two of them).
+                val arrived = if (underStrength > 0f) {
+                    (1f - (kotlin.math.abs(h.x.value - h.targetX) + kotlin.math.abs(h.y.value - h.targetY)) / ArrivedWithin).coerceIn(0f, 1f)
+                } else {
+                    0f
+                }
+                drawFadingOutline(
+                    h.corner.value.dp.toPx(), fadeDepth.toPx(), strength, color,
+                    underStrength = underStrength * arrived, underDepth = underDepth.toPx()
+                )
             }
     )
 }

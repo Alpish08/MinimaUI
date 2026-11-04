@@ -1,10 +1,6 @@
 package com.minimaui.app.ui.components
 
-import androidx.compose.runtime.getValue
 import android.graphics.RuntimeShader
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
@@ -38,6 +34,8 @@ uniform float radius;
 uniform float depth;
 uniform float strength;
 uniform float3 tint;
+uniform float under;
+uniform float underDepth;
 
 half4 main(float2 p) {
     float2 h = size * 0.5;
@@ -47,6 +45,12 @@ half4 main(float2 p) {
     if (coverage <= 0.0) return half4(0.0);
     float t = clamp(-outside / depth, 0.0, 1.0);
     float a = min(strength * (1.0 - t) * (1.0 - t), 0.99) * coverage;
+    if (under > 0.0) {
+        // A steady outline of [under] strength is already drawn below this one: draw only what it still needs, so the two together look like this one alone.
+        float tu = clamp(-outside / underDepth, 0.0, 1.0);
+        float g = min(under * (1.0 - tu) * (1.0 - tu), 0.99) * coverage;
+        a = max(1.0 - (1.0 - a) / (1.0 - g), 0.0);
+    }
     return half4(half3(tint) * a, a);
 }
 """
@@ -107,7 +111,15 @@ fun DrawScope.drawQuickTileOn(radius: Float, scale: Float, amount: Float, ring: 
  * toward the inside over [depth] px (like the Vita's focus glow). [radius] is the shape's corner radius and [strength]
  * scales the whole thing (use it to blink or fade it).
  */
-fun DrawScope.drawFadingOutline(radius: Float, depth: Float, strength: Float, color: Color = Color.White, gain: Float = FocusedOutlineGain) {
+fun DrawScope.drawFadingOutline(
+    radius: Float,
+    depth: Float,
+    strength: Float,
+    color: Color = Color.White,
+    gain: Float = FocusedOutlineGain,
+    underStrength: Float = 0f,
+    underDepth: Float = depth,
+) {
     if (strength <= 0.01f || depth < 1f) return
     val shader = outlineShader
     shader.setFloatUniform("size", size.width, size.height)
@@ -115,6 +127,8 @@ fun DrawScope.drawFadingOutline(radius: Float, depth: Float, strength: Float, co
     shader.setFloatUniform("depth", depth)
     shader.setFloatUniform("strength", strength * gain)
     shader.setFloatUniform("tint", color.red, color.green, color.blue)
+    shader.setFloatUniform("under", underStrength)
+    shader.setFloatUniform("underDepth", underDepth.coerceAtLeast(1f))
     drawRect(ShaderBrush(shader))
 }
 
@@ -135,12 +149,11 @@ fun Modifier.pillOutline(depth: Dp, corner: Dp? = null, strength: () -> Float): 
     }
 }
 
-/** The gray outline of an item that can take the focus: eases out while [focused] (the focus ring takes over) and back in after. */
-@Composable
-fun Modifier.focusFadeOutline(focused: Boolean, depth: Dp, corner: Dp? = null): Modifier {
-    val strength by animateFloatAsState(if (focused) 0f else UnfocusedOutline, tween(200), label = "focusFadeOutline")
-    return pillOutline(depth, corner) { strength }
-}
+/**
+ * The gray outline of an item that can take the focus. It stays put, focused or not: the focus ring that glides from item to item
+ * (see FocusRing's underStrength) is drawn over it and only adds what it needs, so no item loses its outline while the ring is on its way.
+ */
+fun Modifier.focusFadeOutline(depth: Dp, corner: Dp? = null): Modifier = pillOutline(depth, corner) { UnfocusedOutline }
 
 /** The steady, gray outline of an item that is not focused and never will be at the moment (static, behind the content). */
 fun Modifier.unfocusedOutline(depth: Dp, corner: Dp? = null): Modifier = drawBehind {

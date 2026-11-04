@@ -42,6 +42,7 @@ import com.minimaui.app.ui.components.ControlHint
 import com.minimaui.app.ui.components.ControlHintBar
 import com.minimaui.app.ui.components.EaseInOut
 import com.minimaui.app.ui.components.FocusRing
+import com.minimaui.app.ui.components.UnfocusedOutline
 import com.minimaui.app.ui.components.GlowRect
 import com.minimaui.app.ui.components.LocalDimmed
 import com.minimaui.app.ui.components.MarqueeText
@@ -263,7 +264,7 @@ fun SearchDialog(
                         .graphicsLayer { alpha = fade * resultsFocus }
                         .clip(CircleShape)
                         .background(if (active) MenuPillActive else MenuPillIdle)
-                        .focusFadeOutline(active, outlineDepthFor(ResultHeight)),
+                        .focusFadeOutline(outlineDepthFor(ResultHeight)),
                     contentAlignment = Alignment.Center
                 ) {
                     // Like the folder names: centred when it fits, scrolling while focused when it does not.
@@ -280,7 +281,7 @@ fun SearchDialog(
                 }
             }
 
-            FocusRing(focusRect, fadeDepth = outlineDepthFor(ResultHeight))
+            FocusRing(focusRect, fadeDepth = outlineDepthFor(ResultHeight), underStrength = UnfocusedOutline)
 
             if (onResults && results.size > SearchVisibleRows) {
                 val trackHeight = 150f

@@ -31,6 +31,7 @@ import com.minimaui.app.ui.components.ScrollSlider
 import com.minimaui.app.ui.components.ControlHint
 import com.minimaui.app.ui.components.ControlHintBar
 import com.minimaui.app.ui.components.FocusRing
+import com.minimaui.app.ui.components.UnfocusedOutline
 import com.minimaui.app.ui.components.GlowRect
 import com.minimaui.app.ui.components.MarqueeText
 import com.minimaui.app.ui.components.SelectionGlow
@@ -163,7 +164,7 @@ fun FolderChooser(
                         .graphicsLayer { alpha = fade }
                         .clip(CircleShape)
                         .background(if (active) MenuPillActive else MenuPillIdle)
-                        .focusFadeOutline(active, outlineDepthFor(h)),
+                        .focusFadeOutline(outlineDepthFor(h)),
                     contentAlignment = Alignment.Center
                 ) {
                     if (isPlus) {
@@ -185,7 +186,7 @@ fun FolderChooser(
                 }
                 }
             }
-            FocusRing(focusRect, pulsing = true, fadeDepth = outlineDepthFor(focusRect.height))
+            FocusRing(focusRect, pulsing = true, fadeDepth = outlineDepthFor(focusRect.height), underStrength = UnfocusedOutline)
 
             if (rowCount > RowsShown) {
                 val trackHeight = 136f

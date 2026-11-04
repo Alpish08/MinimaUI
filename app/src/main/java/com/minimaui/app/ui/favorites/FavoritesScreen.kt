@@ -344,7 +344,7 @@ private fun BentoPage(
             TileSize.Medium -> 21.dp
             else -> 15.dp
         }
-        FocusRing(focusRect, scale = { lift * press.value * focusScaleFor(focusedSize) }, fadeDepth = fadeDepth)
+        FocusRing(focusRect, scale = { lift * press.value * focusScaleFor(focusedSize) }, fadeDepth = fadeDepth, underStrength = UnfocusedOutline)
     }
 }
 
@@ -382,7 +382,6 @@ private fun LauncherTile(slot: BentoSlot, focused: Boolean, pressTick: Int) {
     val press = rememberPressScale(pressTick, focused)
     val grow by animateFloatAsState(if (focused) focusScaleFor(slot.size) else 1f, tween(200), label = "launcherGrow")
     val shape = RoundedCornerShape(slot.size.corner)
-    val outlineStrength by animateFloatAsState(if (focused) 0f else UnfocusedOutline, tween(200), label = "launcherOutline")
     Box(
         modifier = Modifier
             .offset(slot.x, slot.y)
@@ -395,7 +394,7 @@ private fun LauncherTile(slot: BentoSlot, focused: Boolean, pressTick: Int) {
             .clip(shape)
             .background(if (focused) TileSurfaceFocused else TileFillIdle)
             // The same soft outline as the covers beside it.
-            .softOutline(depth = 15.dp, corner = slot.size.corner) { outlineStrength },
+            .softOutline(depth = 15.dp, corner = slot.size.corner) { UnfocusedOutline },
         contentAlignment = Alignment.Center
     ) {
         Canvas(Modifier.size(80.dp)) {

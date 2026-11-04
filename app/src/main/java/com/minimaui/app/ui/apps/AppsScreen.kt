@@ -281,7 +281,10 @@ private fun AppsPage(
         // The same white-to-transparent, outside-in outline as the XMB covers; it also marks the focus in Edit Mode
         // and on an empty "+" slot.
         Box(withIcon) {
-            FocusRing(focusRect, color = Color.White, intensity = glowIn, scale = { ringScale * press.value }, fadeDepth = AppOutlineDepth)
+            FocusRing(
+                focusRect, color = Color.White, intensity = glowIn, scale = { ringScale * press.value }, fadeDepth = AppOutlineDepth,
+                underStrength = if (focusedApp != null) UnfocusedOutline * FocusedOutlineGain else 0f
+            )
         }
     }
 }
@@ -313,8 +316,7 @@ private fun AppIcon(app: AppEntry, cover: ImageBitmap?, x: Float, y: Float, inde
         label = "appScale"
     )
     val labelShift by animateFloatAsState(if (focused) 16f else 0f, tween(200), label = "labelShift")
-    // Unfocused icons carry the neutral soft outline; the focused one has the brighter, blinking ring instead.
-    val outlineStrength by animateFloatAsState(if (focused) 0f else UnfocusedOutline, tween(200), label = "iconOutline")
+    // Every icon keeps the neutral soft outline; the focused one has the brighter, blinking ring over it.
 
     // With the ribbon wave behind the page, an unfocused icon sits on a soft dark backdrop that fades out around it (and
     // under its name), so the wave's lines don't run through it; the focused one has its glow instead.
@@ -350,7 +352,7 @@ private fun AppIcon(app: AppEntry, cover: ImageBitmap?, x: Float, y: Float, inde
             }
             .clip(CircleShape)
             .background(PlaceholderIcon)
-            .softOutline(depth = AppOutlineDepth, gain = FocusedOutlineGain) { outlineStrength }
+            .softOutline(depth = AppOutlineDepth, gain = FocusedOutlineGain) { UnfocusedOutline }
     ) {
         cover?.let {
             Image(

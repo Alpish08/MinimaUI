@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import com.minimaui.app.ui.components.ControlHint
 import com.minimaui.app.ui.components.ControlHintBar
 import com.minimaui.app.ui.components.FocusRing
+import com.minimaui.app.ui.components.UnfocusedOutline
 import com.minimaui.app.ui.components.GlowRect
 import com.minimaui.app.ui.components.SelectionGlow
 import com.minimaui.app.ui.components.backgroundOutline
@@ -236,7 +237,7 @@ fun SearchKeyboard(
             )
         }
 
-        FocusRing(focusRect, fadeDepth = outlineDepthFor(focused.height))
+        FocusRing(focusRect, fadeDepth = outlineDepthFor(focused.height), underStrength = UnfocusedOutline)
         }
 
         ControlHintBar(
@@ -260,7 +261,7 @@ private fun KeyPill(key: KbKey, label: String, active: Boolean, dim: Boolean, li
             .size((key.width + FocusGrowWidth * grow).dp, (key.height + FocusGrowHeight * grow).dp)
             .clip(CircleShape)
             .background(if (active || lit) MenuPillActive else MenuPillIdle)
-            .focusFadeOutline(active, outlineDepthFor(key.height))
+            .focusFadeOutline(outlineDepthFor(key.height))
             // Shift while the capitals are on: a steady white outline (it does not blink).
             .then(if (lit) Modifier.pillOutline(outlineDepthFor(key.height)) { 1f } else Modifier),
         contentAlignment = Alignment.Center

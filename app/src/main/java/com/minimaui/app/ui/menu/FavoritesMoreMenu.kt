@@ -100,7 +100,6 @@ fun FavoritesMoreMenu(
         for (i in 0 until MoreMenuEntries) {
             val grow by animateFloatAsState(if (i == selected) 1f + SlotGrow else 1f, tween(200, easing = EaseInOut), label = "moreGrow")
             val shape = RoundedCornerShape(SlotCorner.dp)
-            val outline by animateFloatAsState(if (i == selected) 0f else UnfocusedOutline, tween(200), label = "moreOutline")
             Box(
                 modifier = Modifier
                     .offset((centerX(i) - SlotSize / 2f).dp, (centerY(i) - SlotSize / 2f).dp)
@@ -113,7 +112,7 @@ fun FavoritesMoreMenu(
                     .clip(shape)
                     .background(if (i == selected) SlotFillFocused else SlotFill)
                     // The covers' soft outline instead of a hard border; the chosen slot gets the ring.
-                    .softOutline(depth = 21.dp, corner = SlotCorner.dp) { outline },
+                    .softOutline(depth = 21.dp, corner = SlotCorner.dp) { UnfocusedOutline },
                 contentAlignment = Alignment.Center
             ) {
                 Image(painterResource(icons[i]), contentDescription = null, modifier = Modifier.size(iconSizes[i].dp))
@@ -123,7 +122,8 @@ fun FavoritesMoreMenu(
             GlowRect(centerX(selected) - SlotSize / 2f, centerY(selected) - SlotSize / 2f, SlotSize, SlotSize, SlotCorner),
             scale = { 1f + SlotGrow },
             // The covers' soft white-to-transparent focus outline.
-            fadeDepth = 21.dp
+            fadeDepth = 21.dp,
+            underStrength = UnfocusedOutline
         )
         ControlHintBar(
             hints = hints,

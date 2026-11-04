@@ -63,7 +63,6 @@ fun GameTile(
     val press = rememberPressScale(pressTick, focused)
     val focusScale by animateFloatAsState(if (focused) focusScaleFor(tileSize) else 1f, tween(200), label = "tileFocusScale")
     val cover = rememberCover(coverUri, with(LocalDensity.current) { tileSize.designSize.roundToPx() })
-    val outlineStrength by animateFloatAsState(if (focused) 0f else UnfocusedOutline, tween(200), label = "tileOutline")
     Box(
         modifier = modifier
             .graphicsLayer {
@@ -81,7 +80,7 @@ fun GameTile(
                     else -> TileFillIdle
                 }
             )
-            // Unfocused tiles get the neutral soft outline (the focused one has the brighter, blinking ring over it).
+            // Every tile keeps the neutral soft outline; the focused one has the brighter, blinking ring over it.
             .softOutline(
                 depth = when (tileSize) {
                     TileSize.Large -> 28.dp
@@ -89,7 +88,7 @@ fun GameTile(
                     TileSize.Small -> 15.dp
                 },
                 corner = tileSize.corner
-            ) { outlineStrength }
+            ) { UnfocusedOutline }
     ) {
         cover?.let {
             // Inset a hair and rounded a little tighter than the tile, so its edge stays under the border.
