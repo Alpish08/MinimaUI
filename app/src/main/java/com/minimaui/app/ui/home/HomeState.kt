@@ -126,6 +126,8 @@ class HomeState(
     var switchSound: () -> Unit = {}
     /** Edit Mode is entered. */
     var editModeSound: () -> Unit = {}
+    /** The search is opened. */
+    var searchSound: () -> Unit = {}
     /** The cancel / confirm sound, for choosing an item of a menu by touch (the key handler plays it for the buttons). */
     var confirmSound: () -> Unit = {}
 
@@ -618,6 +620,7 @@ class HomeState(
         searchCaps = false
         searchInstalled = actions.installedApps()
         searchOpen = true
+        searchSound()
     }
 
     fun updateSearch(text: String) {

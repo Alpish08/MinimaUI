@@ -105,7 +105,7 @@ MinimaUI/
 ```
 
 **Sounds**: drop files named like these in `Sounds/` (`.wav`, `.ogg`, `.mp3` or `.m4a`); any that are missing fall back to Android's click:
-`navigation`, `settings_menu_navigation`, `menu`, `edit_mode`, `page_switch`, `app_launch`, `game_launch`, `app_exit`, `game_exit`, `cancel_confirm`, `keyboard`, `toast_menu`, `mode_switch`. `menu` is for opening the settings and launcher menus (falls back to `settings_menu_navigation`), `edit_mode` is for entering Edit Mode (silent when missing), `mode_switch` for the keyboard's ABC / 123 switch, and `cancel_confirm` for choosing an item in a menu.
+`navigation`, `settings_menu_navigation`, `menu`, `edit_mode`, `page_switch`, `app_launch`, `game_launch`, `app_exit`, `game_exit`, `cancel_confirm`, `keyboard`, `toast_menu`, `mode_switch`. `menu` is for opening the settings and launcher menus (falls back to `settings_menu_navigation`), `edit_mode` is for entering Edit Mode (silent when missing), `mode_switch` for the keyboard's ABC / 123 switch and for opening the search, and `cancel_confirm` for choosing an item in a menu.
 
 Sounds are not included. If you want a PS Vita feel, the community-made [PS Vita SFX pack on DeckThemes](https://deckthemes.com/packs/view?themeId=9dab732c-e05c-4f4b-a6b4-c648a8c144d3) has the system sounds, including ones MinimaUI doesn't use. Its files are named differently from the list above, so listen to them, pick the ones you like, copy them into `Sounds/` and rename each one to the name MinimaUI expects. That pack is made by someone else and I'm not affiliated with it or with Sony; the sounds belong to their owners, so use them for your own device only.
 
