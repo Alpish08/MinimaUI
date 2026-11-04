@@ -856,7 +856,7 @@ class HomeState(
                 MenuEntry(editItemLabel(EditItem.EditMode)),
                 MenuEntry("UI Smoothness [${settings.uiFps} fps]"),
                 MenuEntry("Boot Animation [${if (settings.bootVideoUri != null) "CUSTOM" else "DEFAULT"}]"),
-                MenuEntry("Ambient Clock [${onOff(settings.ambientClock)}]"),
+                MenuEntry("Idle Clock [${onOff(settings.ambientClock)}]"),
             )
             1 -> listOf(
                 MenuEntry("Menu Sounds [${onOff(settings.menuSounds)}]"),
