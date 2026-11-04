@@ -8,10 +8,19 @@ import android.os.Environment
 import android.os.SystemClock
 import java.io.File
 
-/** The UI sounds MinimaUI can play; each is `<file>.wav` (or .ogg/.mp3) in MinimaUI/Sounds. A missing one falls back to the stock click. */
-enum class Sfx(val file: String) {
+/**
+ * The UI sounds MinimaUI can play; each is `<file>.wav` (or .ogg/.mp3/.m4a) in MinimaUI/Sounds. A missing one falls back to the
+ * sound named in [fallback] if that one is there, else to the stock click, except an [optional] one, which is then just silent.
+ */
+enum class Sfx(val file: String, val fallback: Sfx? = null, val optional: Boolean = false) {
     Navigate("navigation"),
     MenuNavigate("settings_menu_navigation"),
+    /** Opening the settings menu or the launcher menu (the nine-dot one). */
+    Menu("menu", fallback = MenuNavigate),
+    /** Pushing against the end of a page, list or menu (switched off for now: see EdgeSoundOn in HomeRoot). */
+    Edge("edge", optional = true),
+    /** Entering Edit Mode. */
+    EditMode("edit_mode", optional = true),
     PageSwitch("page_switch"),
     AppLaunch("app_launch"),
     GameLaunch("game_launch"),
@@ -20,7 +29,7 @@ enum class Sfx(val file: String) {
     CancelConfirm("cancel_confirm"),
     Keyboard("keyboard"),
     Toast("toast_menu"),
-    Switch("switch"),
+    ModeSwitch("mode_switch"),
 }
 
 /**
@@ -67,10 +76,10 @@ class UiSounds(context: Context) {
 
     /** Plays [sfx] (or the stock click when there is no file for it), at most once every [MIN_GAP_MS] for the cursor sounds. */
     fun play(sfx: Sfx) {
-        val id = custom[sfx]
+        val id = custom[sfx] ?: sfx.fallback?.let { custom[it] }
         if (id != null) {
             pool.play(id, VOLUME, VOLUME, 1, 0, 1f)
-        } else {
+        } else if (!sfx.optional) {
             playClick()
         }
     }
@@ -94,7 +103,7 @@ class UiSounds(context: Context) {
     private companion object {
         const val VOLUME = 0.65f
         const val MIN_GAP_MS = 60L
-        val EXTENSIONS = listOf("wav", "ogg", "mp3")
+        val EXTENSIONS = listOf("wav", "ogg", "mp3", "m4a")
         val CLICK_FILES = listOf("Effect_Tick.ogg", "KeypressStandard.ogg").flatMap { name ->
             listOf("/product", "/system", "/system_ext", "/vendor").map { root -> "$root/media/audio/ui/$name" }
         }

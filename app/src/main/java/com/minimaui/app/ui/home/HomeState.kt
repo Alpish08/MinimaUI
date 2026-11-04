@@ -116,9 +116,7 @@ class HomeState(
     /** A weak tick for page and platform changes; set by the UI. */
     var haptic: () -> Unit = {}
     var pageSound: () -> Unit = {}
-    /** The ordinary click for a tap (touch has no key handler to play it). */
-    var tapSound: () -> Unit = {}
-    /** The menu sound, for choosing a launcher menu entry by touch. */
+    /** The menu sound, for opening the launcher menu by touch. */
     var menuSound: () -> Unit = {}
     /** Pressing a key of the search keyboard. */
     var keySound: () -> Unit = {}
@@ -126,7 +124,9 @@ class HomeState(
     var toastSound: () -> Unit = {}
     /** Switching the keyboard between the letters and the number pad. */
     var switchSound: () -> Unit = {}
-    /** The cancel / confirm sound, for opening and closing the launcher menu by touch. */
+    /** Edit Mode is entered. */
+    var editModeSound: () -> Unit = {}
+    /** The cancel / confirm sound, for choosing an item of a menu by touch (the key handler plays it for the buttons). */
     var confirmSound: () -> Unit = {}
 
     // Volume / brightness bars (shown when the system changes a level) and the short message pill.
@@ -351,12 +351,12 @@ class HomeState(
 
     /** A tap on a launcher menu entry (the random game has its own launch sound). */
     fun tapMore(index: Int) {
-        if (index != 2) menuSound()
+        if (index != 2) confirmSound()
         chooseMore(index)
     }
 
     fun tapFolder(index: Int) {
-        tapSound()
+        confirmSound()
         chooseFolder(index)
     }
 
@@ -1109,6 +1109,7 @@ class HomeState(
     private fun changeEditMode(on: Boolean) {
         editMode = on
         held = false
+        if (on) editModeSound()
         if (!on) appsNav.clamp()
     }
 
@@ -1324,7 +1325,7 @@ class HomeState(
         if (hasLauncher && flat == LauncherFlat) {
             favoritesNav.focusAt(flat)
             openMore()
-            confirmSound()
+            menuSound()
             return
         }
         val game = favoriteGameAt(flat) ?: return
@@ -1442,7 +1443,10 @@ class HomeState(
         if (!menuOpen) return
         menuFocus = MenuFocus.Actions
         menuAction = index
-        if (entry.slider == null) performMenuAction()
+        if (entry.slider == null) {
+            confirmSound()
+            performMenuAction()
+        }
     }
 
     fun touchMenuOutside() {
@@ -1686,7 +1690,6 @@ class HomeState(
         val game = hiddenGames.getOrNull(index) ?: return
         library.restoreGame(game.id)
         menuAction = menuAction.coerceAtMost((hiddenGames.size - 1).coerceAtLeast(0))
-        confirmSound()
     }
 
     /** Edit Mode, from the Customization menu: not offered in the Recently Played view (nothing there can be arranged). */

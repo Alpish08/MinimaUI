@@ -105,6 +105,9 @@ import com.minimaui.app.ui.theme.OledBlack
 
 private enum class HomePage { Favorites, AllGames, Apps }
 
+/** The edge sound (pushing against the end of a page, list or menu) is off for now; switch it on here. */
+private const val EdgeSoundOn = false
+
 /** The user's boot animation video: playing, played (or skipped) and fading out, failed to play (the logo comes instead), or not (or no longer) there. */
 private enum class BootVideoPhase { Playing, Finished, Failed, Gone }
 
@@ -170,10 +173,10 @@ fun HomeRoot(
     state.haptic = haptics::tick
     state.pageSound = { if (settings.menuSounds) uiSounds.play(Sfx.PageSwitch) }
     state.confirmSound = { if (settings.menuSounds) uiSounds.play(Sfx.CancelConfirm) }
-    state.tapSound = { if (settings.menuSounds) uiSounds.play(Sfx.Navigate) }
-    state.menuSound = { if (settings.menuSounds) uiSounds.play(Sfx.MenuNavigate) }
+    state.menuSound = { if (settings.menuSounds) uiSounds.play(Sfx.Menu) }
+    state.editModeSound = { if (settings.menuSounds) uiSounds.play(Sfx.EditMode) }
     state.keySound = { if (settings.menuSounds) uiSounds.play(Sfx.Keyboard) }
-    state.switchSound = { if (settings.menuSounds) uiSounds.play(Sfx.Switch) }
+    state.switchSound = { if (settings.menuSounds) uiSounds.play(Sfx.ModeSwitch) }
     state.toastSound = { if (settings.menuSounds) uiSounds.play(Sfx.Toast) }
 
     // The right stick turns pages: each push past the threshold counts once, and it must return to centre to count again.
@@ -355,8 +358,10 @@ fun HomeRoot(
                 }
                 // Select is a tap (details card) or a hold with a shoulder button (volume / brightness bars).
                 if (event.key == Key.ButtonStart) {
+                    val menuWas = state.menuOpen
                     val toggled = state.onStart(event.type == KeyEventType.KeyDown, event.nativeKeyEvent.repeatCount > 0)
-                    if (toggled && settings.menuSounds) uiSounds.play(Sfx.MenuNavigate)
+                    // Start opens (and closes) the settings menu with the menu sound; the other things it confirms keep the old one.
+                    if (toggled && settings.menuSounds) uiSounds.play(if (state.menuOpen != menuWas) Sfx.Menu else Sfx.MenuNavigate)
                     return@onPreviewKeyEvent true
                 }
                 if (event.key == Key.ButtonSelect) {
@@ -417,8 +422,12 @@ fun HomeRoot(
                         val handled = state.onKey(event.key, isRepeat = event.nativeKeyEvent.repeatCount > 0)
                         val isDirection = event.key == Key.DirectionUp || event.key == Key.DirectionDown ||
                             event.key == Key.DirectionLeft || event.key == Key.DirectionRight
-                        // No click for a push against an edge (the cursor didn't move) or a B with nothing to go back to.
-                        val silent = idleBack || (isDirection && state.cursorSignature == before)
+                        // A push against an edge (the cursor didn't move) has the edge sound, once per press; a B with nothing to go back to is silent.
+                        val atEdge = isDirection && state.cursorSignature == before
+                        val silent = idleBack || atEdge
+                        val edgeSound = handled && atEdge && !idleBack && event.nativeKeyEvent.repeatCount == 0 && !typingBefore &&
+                            !keyboardBefore && state.detailsGame == null
+                        if (EdgeSoundOn && edgeSound && settings.menuSounds) uiSounds.play(Sfx.Edge)
                         if (handled && !silent && settings.menuSounds) {
                             val overlay = state.overlayOpen
                             when {
@@ -432,18 +441,22 @@ fun HomeRoot(
                                 keyboardBefore && (event.key == Key.ButtonA || event.key == Key.Enter || event.key == Key.DirectionCenter ||
                                     event.key == Key.ButtonX || event.key == Key.ButtonY) -> uiSounds.play(Sfx.Keyboard)
                                 // Opening the launcher menu; leaving it with B is silent (choosing an entry plays its own sound).
-                                !moreBefore && state.moreOpen -> uiSounds.play(Sfx.CancelConfirm)
-                                // Choosing an entry of the launcher menu: the menu sound (the random game has its own launch sound).
+                                !moreBefore && state.moreOpen -> uiSounds.play(Sfx.Menu)
+                                // Choosing an entry of the launcher menu: the confirm sound (the random game has its own launch sound).
                                 moreBefore && (event.key == Key.ButtonA || event.key == Key.Enter || event.key == Key.DirectionCenter) ->
-                                    if (state.moreIndex != 2) uiSounds.play(Sfx.MenuNavigate)
+                                    if (state.moreIndex != 2) uiSounds.play(Sfx.CancelConfirm)
                                 moreBefore && !state.moreOpen && (event.key == Key.ButtonB || event.key == Key.Back || event.key == Key.Escape) -> Unit
                                 // Opening the settings menu or switching between Favorites / All Games / Apps; closing the menu is silent.
-                                state.menuOpen && !menuBefore || state.screen != screenBefore -> uiSounds.play(Sfx.MenuNavigate)
+                                state.menuOpen && !menuBefore -> uiSounds.play(Sfx.Menu)
+                                state.screen != screenBefore -> uiSounds.play(Sfx.MenuNavigate)
                                 menuBefore && !state.menuOpen -> Unit
-                                // Page changes play their own sound (so the right stick and touch swipes get it too).
-                                event.key == Key.ButtonL1 || event.key == Key.ButtonR1 -> Unit
+                                // Page changes play their own sound (so the right stick and touch swipes get it too); at the last or first page it is the edge sound.
+                                event.key == Key.ButtonL1 || event.key == Key.ButtonR1 ->
+                                    if (EdgeSoundOn && state.cursorSignature == before && event.nativeKeyEvent.repeatCount == 0) uiSounds.play(Sfx.Edge)
                                 // A on the home screens launches something, which has its own sound.
                                 (event.key == Key.ButtonA || event.key == Key.Enter || event.key == Key.DirectionCenter) && !overlay -> Unit
+                                // Enter on an item of a menu.
+                                event.key == Key.ButtonA || event.key == Key.Enter || event.key == Key.DirectionCenter -> uiSounds.play(Sfx.CancelConfirm)
                                 else -> uiSounds.play(Sfx.Navigate)
                             }
                         }
