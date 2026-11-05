@@ -60,9 +60,10 @@ More platforms and emulators will be added as feedback comes in, so please tell 
 | Nintendo 64 | `.n64 .z64 .v64 .ndd .zip` | Mupen64Plus FZ |
 | Nintendo DS | `.nds .dsi .zip` | melonDS, DraStic, NooDS |
 | Game Boy / Color / Advance | `.gb .gbc .gba .zip` | Pizza Boy, My Boy / My OldBoy, GBA.emu / GBC.emu |
+| SNES (and NES, in the same folder) | `.sfc .smc .swc .fig .bs` and more; `.nes .fds .unf`; `.zip` | Snes9x EX+ / NES.emu / Nesoid, or RetroArch (Snes9x and FCEUmm cores) |
 | Dreamcast | `.gdi .cdi .chd .cue .iso .m3u` | Flycast, Redream |
 
-The PS1, PS3, Xbox 360, GameCube, Wii, N64, DS, Game Boy and Dreamcast entries come from ES-DE's published launch rules and have **not been tried on a device yet**: if one doesn't start, please open an issue with the emulator and its version.
+The PS1, PS3, Xbox 360, GameCube, Wii, N64, DS, Game Boy, SNES / NES and Dreamcast entries come from ES-DE's published launch rules and have **not been tried on a device yet**: if one doesn't start, please open an issue with the emulator and its version.
 
 You can send any ROM game to a different emulator: *Start menu → Edit Current Game → Custom Emulator* (one game), or in the platform Edit Mode *Edit Current Platform → Default Emulator* (the whole platform). Press X on either to go back to the original.
 
@@ -73,7 +74,7 @@ MinimaUI does not include any games, BIOS files, emulators or artwork of the pla
 2. **Install the APK** from the [Releases](../../releases) page (allow "install unknown apps" for your browser or file manager).
 3. **Open MinimaUI** and allow **All files access** when asked. MinimaUI needs it to read your ROM folders and to keep its own `MinimaUI/` folder.
 4. **Make it your home app** (optional): Android Settings → Apps → Default apps → Home app → MinimaUI. Pressing Home then returns to it.
-5. **Add your ROM folders**: press **Start** → **ROMs Folder(s)** → the **+** pill, then pick the folder that holds your platform folders. Inside it, name one folder per platform: `PSP`, `PS1`, `PS2`, `PS3`, `Switch`, `3DS`, `WiiU`, `Wii`, `GameCube`, `N64`, `DS`, `GBA` (or `GB`, `GBC`, `Game Boy`), `Dreamcast`, `Vita` (or `PSV`), `Xbox`, `Xbox360`, `Android`, `Artemis` (the Windows `.art` files). Names are not case sensitive and spaces are ignored (`Nintendo Switch` works). Press **Y** on that screen to rescan whenever you add games.
+5. **Add your ROM folders**: press **Start** → **ROMs Folder(s)** → the **+** pill, then pick the folder that holds your platform folders. Inside it, name one folder per platform: `PSP`, `PS1`, `PS2`, `PS3`, `Switch`, `3DS`, `WiiU`, `Wii`, `GameCube`, `N64`, `DS`, `GBA` (or `GB`, `GBC`, `Game Boy`), `SNES` (or `NES`), `Dreamcast`, `Vita` (or `PSV`), `Xbox`, `Xbox360`, `Android`, `Artemis` (the Windows `.art` files). Names are not case sensitive and spaces are ignored (`Nintendo Switch` works). Press **Y** on that screen to rescan whenever you add games.
 6. **Add Android games and apps**: turn on **Edit Mode** (Start → Customization), then on All Games the Android and Steam rows end with a **+** (Steam games take a title and their GameHub id), and on the Apps page press **A** on an empty slot to pick an app.
 
 # Getting around (no first-time screen needed)

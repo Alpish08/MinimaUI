@@ -23,6 +23,7 @@ object PlatformCatalog {
         Platform("n64", "N64", 428f / 1434f),
         Platform("nds", "DS", 276f / 1921f),
         Platform("gb", "Game Boy", 343f / 1921f),
+        Platform("snes", "SNES", 510f / 1920f),
         Platform("dreamcast", "Dreamcast", 330f / 1920f),
         Platform("xbox360", "Xbox 360", 396f / 1920f),
     )
@@ -48,6 +49,7 @@ object PlatformCatalog {
         "n64" to listOf("Nintendo 64"),
         "nds" to listOf("Nintendo DS"),
         "gb" to listOf("Nintendo Game Boy", "Nintendo Game Boy Advance"),
+        "snes" to listOf("Super Nintendo Entertainment System", "Nintendo SNES", "Nintendo Entertainment System", "SNES"),
         "xbox" to listOf("Microsoft Xbox"),
         "xbox360" to listOf("Microsoft Xbox 360"),
         "dreamcast" to listOf("Sega Dreamcast"),
@@ -71,6 +73,8 @@ object PlatformCatalog {
         "n64" to "n64", "nintendo64" to "n64",
         "nds" to "nds", "ds" to "nds", "nintendods" to "nds",
         "gb" to "gb", "gbc" to "gb", "gba" to "gb", "gameboy" to "gb", "gameboycolor" to "gb", "gameboyadvance" to "gb",
+        "snes" to "snes", "sfc" to "snes", "supernintendo" to "snes", "supernintendoentertainmentsystem" to "snes", "superfamicom" to "snes",
+        "nes" to "snes", "fc" to "snes", "famicom" to "snes", "nintendoentertainmentsystem" to "snes",
         "dreamcast" to "dreamcast", "dc" to "dreamcast", "segadreamcast" to "dreamcast",
         "xbox360" to "xbox360", "x360" to "xbox360", "360" to "xbox360", "microsoftxbox360" to "xbox360",
     )
@@ -92,6 +96,7 @@ object PlatformCatalog {
         "n64" to setOf("n64", "z64", "v64", "ndd", "zip"),
         "nds" to setOf("nds", "dsi", "zip"),
         "gb" to setOf("gb", "gbc", "gba", "zip"),
+        "snes" to setOf("sfc", "smc", "swc", "fig", "bs", "bsx", "st", "gd3", "gd7", "dx2", "mgd", "bml", "nes", "fds", "unf", "unif", "zip"),
         "dreamcast" to setOf("gdi", "cdi", "chd", "cue", "iso", "m3u"),
         "xbox360" to setOf("iso", "xex", "zar"),
     )

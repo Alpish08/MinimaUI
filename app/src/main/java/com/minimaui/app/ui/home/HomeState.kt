@@ -2070,7 +2070,7 @@ class HomeState(
         const val AudioPage = 1
         val PlatformMenuOrder =
             listOf(
-                "android", "steam", "windows", "switch", "wiiu", "wii", "gc", "n3ds", "nds", "gb", "n64", "xbox", "xbox360",
+                "android", "steam", "windows", "switch", "wiiu", "wii", "gc", "n3ds", "nds", "gb", "snes", "n64", "xbox", "xbox360",
                 "ps1", "ps2", "ps3", "psp", "vita", "dreamcast",
             )
     }

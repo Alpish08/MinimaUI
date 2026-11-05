@@ -237,6 +237,11 @@ class GameLauncher(private val context: Context) {
 
     /** The emulators to try for a game with this extension (Game Boy games go to the Game Boy or the Game Boy Advance ones by it). */
     private fun emulatorsFor(platformId: String, extension: String): List<Emu> = when (platformId) {
+        "snes" -> when (extension) {
+            in nesExtensions -> nesEmulators
+            in snesExtensions -> snesEmulators
+            else -> snesEmulators + nesEmulators
+        }
         "gb" -> when (extension) {
             "gba" -> gbaEmulators
             "gb", "gbc" -> gbcEmulators
@@ -318,12 +323,36 @@ class GameLauncher(private val context: Context) {
         const val GAMEHUB_LITE_ACTIVITY = "com.xj.landscape.launcher.ui.gamedetail.GameDetailActivity"
 
         /** The platforms started through [modernEmulators]. */
-        val modernPlatforms = setOf("ps1", "gc", "wii", "dreamcast", "n64", "nds", "gb", "ps3", "xbox360")
+        val modernPlatforms = setOf("ps1", "gc", "wii", "dreamcast", "n64", "nds", "gb", "snes", "ps3", "xbox360")
 
         val platformLabels = mapOf(
             "ps1" to "PS1", "gc" to "GameCube", "wii" to "Wii", "dreamcast" to "Dreamcast", "n64" to "N64", "nds" to "DS",
-            "gb" to "Game Boy", "ps3" to "PS3", "xbox360" to "Xbox 360",
+            "gb" to "Game Boy", "snes" to "SNES", "ps3" to "PS3", "xbox360" to "Xbox 360",
         )
+
+        val nesExtensions = setOf("nes", "fds", "unf", "unif", "3dsen")
+        val snesExtensions = setOf("sfc", "smc", "swc", "fig", "bs", "bsx", "st", "gd3", "gd7", "dx2", "mgd", "bml")
+
+        // RetroArch starts a game with the core to run it, given as the path of the core's library, and its config file.
+        private fun retroArch(pkg: String, core: String) =
+            Emu("$pkg/com.retroarch.browser.retroactivity.RetroActivityFuture", action = null, data = false) { rom ->
+                mapOf(
+                    "ROM" to (rom.path ?: rom.uri.toString()),
+                    "LIBRETRO" to "/data/data/$pkg/cores/${core}_libretro_android.so",
+                    "CONFIGFILE" to "/storage/emulated/0/Android/data/$pkg/files/retroarch.cfg",
+                )
+            }
+
+        private fun retroArchAll(core: String) =
+            listOf("com.retroarch.aarch64", "com.retroarch.ra32", "com.retroarch").map { retroArch(it, core) }
+
+        // The standalone emulators first, then RetroArch (with the Snes9x / FCEUmm cores).
+        private val snesEmulators = listOf(Emu("com.explusalpha.Snes9xPlus/com.imagine.BaseActivity")) + retroArchAll("snes9x")
+
+        private val nesEmulators = listOf(
+            Emu("com.explusalpha.NesEmu/com.imagine.BaseActivity"),
+            Emu("com.androidemu.nes/.EmulatorActivity"),
+        ) + retroArchAll("fceumm")
 
         private fun uriExtra(name: String): (Rom) -> Map<String, Any> = { mapOf(name to it.uri.toString()) }
 

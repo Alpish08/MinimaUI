@@ -140,6 +140,7 @@ private val LogoWidths = mapOf(
     "n64" to 440f,
     "nds" to 560f,
     "gb" to 520f,
+    "snes" to 440f,
     "dreamcast" to 520f,
     "xbox360" to 520f,
 )
@@ -164,6 +165,7 @@ private val CornerRatios = mapOf(
     "n64" to 0.24f,
     "nds" to 0.22f,
     "gb" to 0.24f,
+    "snes" to 0.24f,
     "dreamcast" to 0.20f,
     "xbox360" to 0.24f,
 )

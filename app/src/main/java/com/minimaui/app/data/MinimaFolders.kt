@@ -13,7 +13,7 @@ object MinimaFolders {
         "Cover Art/Favorites",
     ) + listOf(
         "Android", "Nintendo Switch", "PS2", "PSP", "Steam", "Vita", "Windows", "WiiU", "XBOX", "3DS",
-        "PS1", "PS3", "GameCube", "Wii", "N64", "DS", "Game Boy", "Dreamcast", "Xbox 360",
+        "PS1", "PS3", "GameCube", "Wii", "N64", "DS", "Game Boy", "SNES", "Dreamcast", "Xbox 360",
     )
         .map { "Cover Art/All Games/$it" }
 

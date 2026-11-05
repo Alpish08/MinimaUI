@@ -87,6 +87,12 @@
         <package android:name="emuready.gamehub.lite" />
         <package android:name="gamehub.lite" />
         <package android:name="com.limelight" />
+        <package android:name="com.explusalpha.Snes9xPlus" />
+        <package android:name="com.explusalpha.NesEmu" />
+        <package android:name="com.androidemu.nes" />
+        <package android:name="com.retroarch" />
+        <package android:name="com.retroarch.aarch64" />
+        <package android:name="com.retroarch.ra32" />
     </queries>
 
     <application
