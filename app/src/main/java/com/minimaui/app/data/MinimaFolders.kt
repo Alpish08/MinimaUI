@@ -11,7 +11,10 @@ object MinimaFolders {
         "Music",
         "Sounds",
         "Cover Art/Favorites",
-    ) + listOf("Android", "Nintendo Switch", "PS2", "PSP", "Steam", "Vita", "Windows", "WiiU", "XBOX", "3DS")
+    ) + listOf(
+        "Android", "Nintendo Switch", "PS2", "PSP", "Steam", "Vita", "Windows", "WiiU", "XBOX", "3DS",
+        "PS1", "PS3", "GameCube", "Wii", "N64", "DS", "Game Boy", "Dreamcast", "Xbox 360",
+    )
         .map { "Cover Art/All Games/$it" }
 
     /** Creates any folder that is missing; returns true once all of them exist, so a launch without access tries again later. */

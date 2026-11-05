@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import com.minimaui.app.data.LibraryStore
+import com.minimaui.app.data.PlatformCatalog
 
 /** A named group of games the user made (the Folder in the Favorites menu); [gameIds] keep the user's order. */
 data class Folder(val id: String, val name: String, val gameIds: List<String>)
@@ -214,8 +215,28 @@ class Library(
 
     fun customEmulatorOf(id: String): String? = emulatorOverrides[id]
 
-    /** The image the user picked for a platform's tile on All Games, or null for the built-in logo. */
-    fun platformIcon(platform: Platform): String? = platformIcons[platform.id]
+    /** The image the user picked for a platform's tile on All Games, or null if they haven't. */
+    fun customPlatformIcon(platform: Platform): String? = platformIcons[platform.id]
+
+    // The images found in MinimaUI/Platform Icons under a platform's usual names (see PlatformCatalog.iconNames), used until the user picks one.
+    private val defaultIcons = mutableStateMapOf<String, String>()
+
+    /** Looks in MinimaUI/Platform Icons for the platforms' images (again, when the folder may have changed). */
+    fun refreshDefaultIcons() {
+        val files = java.io.File(android.os.Environment.getExternalStorageDirectory(), "MinimaUI/Platform Icons").listFiles()
+            ?.filter { it.isFile && it.extension.lowercase() in setOf("png", "webp", "jpg", "jpeg") }
+            .orEmpty()
+        val byName = files.associateBy { it.nameWithoutExtension.lowercase() }
+        val found = platforms.mapNotNull { platform ->
+            PlatformCatalog.iconNames[platform.id].orEmpty().firstNotNullOfOrNull { byName[it.lowercase()] }
+                ?.let { platform.id to android.net.Uri.fromFile(it).toString() }
+        }.toMap()
+        defaultIcons.keys.filter { it !in found }.forEach { defaultIcons.remove(it) }
+        defaultIcons.putAll(found)
+    }
+
+    /** The image on a platform's tile on All Games: the one the user picked, else the one in MinimaUI/Platform Icons, else null for its name as text. */
+    fun platformIcon(platform: Platform): String? = platformIcons[platform.id] ?: defaultIcons[platform.id]
 
     /** The title the user gave a platform: its tile then shows that text instead of the built-in logo (null for the logo). */
     fun platformTitle(platform: Platform): String? = platformTitles[platform.id]

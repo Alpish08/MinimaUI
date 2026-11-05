@@ -11,6 +11,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import kotlin.math.roundToInt
 import com.minimaui.app.data.AndroidGames
+import com.minimaui.app.data.GameHubGames
 import com.minimaui.app.model.AppEntry
 import com.minimaui.app.model.AppLibrary
 import com.minimaui.app.data.InstalledApp
@@ -242,9 +243,20 @@ class HomeState(
             else -> "Edit Game Title"
         }
 
-    /** Favorites of platforms that are switched on (the others stay remembered, just not shown). */
+    /** The platforms that have games to show right now. */
+    private val platformsWithGames: Set<String> by derivedStateOf {
+        library.platforms.filter { library.gamesFor(it).isNotEmpty() }.map { it.id }.toSet()
+    }
+
+    /** Whether a platform shows on All Games when the user hasn't chosen: Android and Steam always (their games are added there by hand), the others while they have games. */
+    private fun platformAutoShown(id: String) = id in PlusPlatforms || id in platformsWithGames
+
+    /** A platform shows if the user switched it on, or (unless switched off) while it has games. */
+    private fun platformShown(id: String): Boolean = settings.platformOverride(id) ?: platformAutoShown(id)
+
+    /** Favorites of platforms that are shown (the others stay remembered, just not shown). */
     val favorites: List<GameEntry> by derivedStateOf {
-        library.favorites.filter { settings.isPlatformEnabled(it.platformId) }
+        library.favorites.filter { platformShown(it.platformId) }
     }
     val apps: List<AppEntry> by derivedStateOf { appLibrary.apps }
 
@@ -767,7 +779,7 @@ class HomeState(
     /** Platforms the user has switched on, in the order they arranged them (alphabetical until they do). */
     val visiblePlatforms: List<Platform> by derivedStateOf {
         library.platforms
-            .filter { settings.isPlatformEnabled(it.id) }
+            .filter { platformShown(it.id) }
             .sortedBy { platform -> settings.platformOrder.indexOf(platform.id).let { if (it < 0) Int.MAX_VALUE else it } }
     }
 
@@ -818,10 +830,10 @@ class HomeState(
             MenuContext.Apps -> if (menuApp != null) listOf(EditItem.EditAppTitle, EditItem.ToggleFavorite, EditItem.HideApp) else emptyList()
             MenuContext.Favorites, MenuContext.AllGames ->
                 if (menuGame != null) {
-                    // The custom emulator is for ROM files; shortcuts, GameHub and Android games start through their own app.
+                    // The custom emulator is for ROM files and GameHub-listed Steam games (which a Steam launcher can start instead); shortcuts and Android games start through their own app.
                     listOfNotNull(
                         EditItem.EditTitle, EditItem.SelectCover, EditItem.ToggleFavorite, EditItem.AddToFolder,
-                        EditItem.CustomEmulator.takeIf { menuGame?.fileUri != null }, EditItem.RemoveFromLibrary
+                        EditItem.CustomEmulator.takeIf { menuGame?.fileUri != null || menuGame?.shortcutId?.startsWith(GameHubGames.PREFIX) == true }, EditItem.RemoveFromLibrary
                     )
                 } else {
                     emptyList()
@@ -867,7 +879,7 @@ class HomeState(
                 MenuEntry("Pick Menu BGM…"),
                 MenuEntry("Volume", slider = settings.volume),
             )
-            else -> menuPlatforms.map { MenuEntry(library.platformTitle(it) ?: it.menuLabel, dot = settings.isPlatformEnabled(it.id)) }
+            else -> menuPlatforms.map { MenuEntry(library.platformTitle(it) ?: it.menuLabel, dot = platformShown(it.id)) }
         }
         MenuCategory.RomFolders -> settings.romFolders.map { MenuEntry(Settings.romFolderLabel(it)) } + MenuEntry("+", plus = true)
         MenuCategory.Backup -> listOf(MenuEntry("Backup Current Settings"), MenuEntry("Restore Settings"))
@@ -903,7 +915,7 @@ class HomeState(
         val platform = visiblePlatforms.getOrNull(selectedPlatformIndex)
         return when (item) {
             EditItem.CustomEmulator -> menuGame?.customEmulator != null
-            EditItem.PlatformIcon -> platform != null && library.platformIcon(platform) != null
+            EditItem.PlatformIcon -> platform != null && library.customPlatformIcon(platform) != null
             EditItem.PlatformTitle -> platform != null && library.platformTitle(platform) != null
             EditItem.PlatformEmulator -> platform != null && library.platformEmulator(platform) != null
             else -> false
@@ -1463,7 +1475,8 @@ class HomeState(
 
     /** The ROM folders and the hidden games are long lists that scroll. */
     private val menuListScrolls: Boolean
-        get() = menuCategory == MenuCategory.RomFolders || (menuCategory == MenuCategory.EditGame && menuPage == 1)
+        get() = menuCategory == MenuCategory.RomFolders || (menuCategory == MenuCategory.EditGame && menuPage == 1) ||
+            (menuCategory == MenuCategory.Customize && menuPage != AudioPage)
 
     /** Finger-scrolling the ROM folders list of the menu: [delta] entries on. */
     fun touchMenuStep(delta: Int) {
@@ -1472,7 +1485,9 @@ class HomeState(
         if (count == 0) return
         menuFocus = MenuFocus.Actions
         val before = menuAction
-        menuAction = (menuAction + delta).coerceIn(0, count - 1)
+        // The platforms are two to a row: a step is a row.
+        val step = if (platformsPage) delta * 2 else delta
+        menuAction = (menuAction + step).coerceIn(0, count - 1)
         if (menuAction != before) haptic()
     }
 
@@ -1482,8 +1497,15 @@ class HomeState(
         val count = menuEntries.size
         if (count == 0) return
         menuFocus = MenuFocus.Actions
-        menuAction = (fraction * (count - 1)).roundToInt().coerceIn(0, count - 1)
+        menuAction = if (platformsPage) {
+            val rows = (count + 1) / 2
+            ((fraction * (rows - 1)).roundToInt().coerceIn(0, rows - 1) * 2 + menuAction % 2).coerceAtMost(count - 1)
+        } else {
+            (fraction * (count - 1)).roundToInt().coerceIn(0, count - 1)
+        }
     }
+
+    private val platformsPage: Boolean get() = menuCategory == MenuCategory.Customize && menuPage == 2
 
     /** A swipe (or a tap on a page dot) in the menu: [delta] pages forward or back. */
     fun touchMenuPage(delta: Int) {
@@ -1631,7 +1653,10 @@ class HomeState(
             }
             MenuLayout.Grid -> when (direction) {
                 Direction.Up -> menuAction - 2
-                Direction.Down -> menuAction + 2
+                // The last row may have one platform only: from the right-hand one above it, Down reaches that one.
+                Direction.Down -> menuEntries.lastIndex.let { last ->
+                    if (menuAction + 2 <= last) menuAction + 2 else if (menuAction / 2 < last / 2) last else null
+                }
                 Direction.Left -> if (menuAction % 2 == 1) menuAction - 1 else null
                 Direction.Right -> if (menuAction % 2 == 0) menuAction + 1 else null
             }
@@ -1682,7 +1707,11 @@ class HomeState(
                     1 -> settings.cycleBackgroundMusic()
                     2 -> actions.pickBackgroundMusic()
                 }
-                else -> menuPlatforms.getOrNull(menuAction)?.let { settings.setPlatformEnabled(it.id, !settings.isPlatformEnabled(it.id)) }
+                else -> menuPlatforms.getOrNull(menuAction)?.let {
+                    // Back to "follows its games" when the choice is what it would be anyway.
+                    val wanted = !platformShown(it.id)
+                    settings.setPlatformOverride(it.id, if (wanted == platformAutoShown(it.id)) null else wanted)
+                }
                     .also { clampSelections() }
             }
             MenuCategory.RomFolders ->
@@ -2040,6 +2069,9 @@ class HomeState(
         const val AudioVolumeIndex = 3
         const val AudioPage = 1
         val PlatformMenuOrder =
-            listOf("android", "steam", "xbox", "n3ds", "psp", "wiiu", "ps2", "switch", "vita", "windows")
+            listOf(
+                "android", "steam", "windows", "switch", "wiiu", "wii", "gc", "n3ds", "nds", "gb", "n64", "xbox", "xbox360",
+                "ps1", "ps2", "ps3", "psp", "vita", "dreamcast",
+            )
     }
 }

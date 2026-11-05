@@ -181,9 +181,10 @@ private fun entryRect(layout: MenuLayout, index: Int, count: Int, scroll: Float 
     // Page 3: the platforms, two to a row.
     MenuLayout.Grid -> {
         val column = index % 2
-        val rows = (count + 1) / 2
-        val top = PagedCenterY + 14f - ((rows - 1) * 123f + 80f) / 2f
-        UiRect(if (column == 0) 852f else 1203f, top + index / 2 * 123f, 298f, 80f)
+        // Five rows show at a time; more scroll.
+        val rows = minOf((count + 1) / 2, GridRowsShown)
+        val top = PagedCenterY + 14f - ((rows - 1) * GridPitch + 80f) / 2f
+        UiRect(if (column == 0) 852f else 1203f, top + index / 2 * GridPitch - scroll, 298f, 80f)
     }
     MenuLayout.Folders ->
         if (index < count - 1) {
@@ -225,6 +226,11 @@ private const val FolderRowsShown = 5
 private const val FolderFirstY = 162f
 private const val FolderCenterY = SubCenterY
 
+// The platforms page: two columns, five rows at a time.
+private const val GridRowsShown = 5
+private const val GridPitch = 123f
+private const val GridFirstY = PagedCenterY + 14f - ((GridRowsShown - 1) * GridPitch + 80f) / 2f
+
 // The first page of Customization: five rows at a time, the pills keep their size however many entries there are.
 private const val SettingsRowsShown = 5
 private const val SettingsPitch = 126f
@@ -262,11 +268,12 @@ private fun scrollFade(layout: MenuLayout, rect: UiRect, scroll: Float, count: I
     when (layout) {
         MenuLayout.HiddenList -> hiddenFade(rect, scroll, count)
         MenuLayout.Settings -> hiddenFade(rect, scroll, count, SettingsFirstY, SettingsPitch)
+        MenuLayout.Grid -> hiddenFade(rect, scroll, (count + 1) / 2, GridFirstY, GridPitch)
         else -> folderFade(rect)
     }
 
 /** The layouts whose list scrolls (and fades at its ends). */
-private val MenuLayout.scrolls: Boolean get() = this == MenuLayout.Folders || this == MenuLayout.HiddenList || this == MenuLayout.Settings
+private val MenuLayout.scrolls: Boolean get() = this == MenuLayout.Folders || this == MenuLayout.HiddenList || this == MenuLayout.Settings || this == MenuLayout.Grid
 
 private fun folderScrollFor(layout: MenuLayout, count: Int, selected: Int): Float =
     if (layout == MenuLayout.HiddenList) {
@@ -274,6 +281,9 @@ private fun folderScrollFor(layout: MenuLayout, count: Int, selected: Int): Floa
         (selected - HiddenRowsShown / 2).coerceIn(0, maxOf(count - HiddenRowsShown, 0)) * HiddenPitch
     } else if (layout == MenuLayout.Settings) {
         (selected - SettingsRowsShown / 2).coerceIn(0, maxOf(count - SettingsRowsShown, 0)) * SettingsPitch
+    } else if (layout == MenuLayout.Grid) {
+        // The row of the selected platform stays in the middle of the five, except near the ends.
+        (selected / 2 - GridRowsShown / 2).coerceIn(0, maxOf((count + 1) / 2 - GridRowsShown, 0)) * GridPitch
     } else if (layout.scrolls && count > FolderRowsShown) maxOf(FolderFirstY + selected * FolderPitch + FolderRowHeight / 2f - FolderCenterY, 0f) else 0f
 
 /**
@@ -610,10 +620,19 @@ private fun EntryPage(
             }
         }
 
-        if (layout.scrolls && entries.size > FolderRowsShown) {
+        val scrollable = when (layout) {
+            MenuLayout.Grid -> entries.size > GridRowsShown * 2
+            MenuLayout.Settings -> entries.size > SettingsRowsShown
+            else -> layout.scrolls && entries.size > FolderRowsShown
+        }
+        if (scrollable) {
             val trackHeight = if (layout == MenuLayout.Folders) 125f else HiddenTrackHeight
-            val trackCenter = if (layout == MenuLayout.Settings) PagedCenterY else SubCenterY
-            val fraction = selected.coerceIn(0, entries.lastIndex) / (entries.size - 1).toFloat()
+            val trackCenter = if (layout == MenuLayout.Settings || layout == MenuLayout.Grid) PagedCenterY else SubCenterY
+            val fraction = if (layout == MenuLayout.Grid) {
+                (selected.coerceIn(0, entries.lastIndex) / 2) / ((entries.size + 1) / 2 - 1).toFloat()
+            } else {
+                selected.coerceIn(0, entries.lastIndex) / (entries.size - 1).toFloat()
+            }
             ScrollSlider(1585f, trackCenter - trackHeight / 2f, trackHeight, fraction, onSeek = onSeekList)
         }
     }

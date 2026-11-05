@@ -52,6 +52,41 @@
         <package android:name="io.github.azahar_emu.azahar" />
         <package android:name="info.cemu.cemu" />
         <package android:name="org.vita3k.emulator" />
+        <package android:name="com.github.stenzek.duckstation" />
+        <package android:name="org.dolphinemu.dolphinemu" />
+        <package android:name="org.dolphinemu.mmjr" />
+        <package android:name="org.mm.jr" />
+        <package android:name="com.flycast.emulator" />
+        <package android:name="io.recompiled.redream" />
+        <package android:name="org.mupen64plusae.v3.fzurita" />
+        <package android:name="org.mupen64plusae.v3.fzurita.pro" />
+        <package android:name="org.mupen64plusae.v3.fzurita.amazon" />
+        <package android:name="org.mupen64plusae.v3.alpha" />
+        <package android:name="me.magnum.melonds" />
+        <package android:name="me.magnum.melondualds" />
+        <package android:name="me.magnum.melonds.nightly" />
+        <package android:name="com.dsemu.drastic" />
+        <package android:name="com.hydra.noods" />
+        <package android:name="it.dbtecno.pizzaboygbapro" />
+        <package android:name="it.dbtecno.pizzaboygba" />
+        <package android:name="it.dbtecno.pizzaboypro" />
+        <package android:name="it.dbtecno.pizzaboy" />
+        <package android:name="com.fastemulator.gba" />
+        <package android:name="com.fastemulator.gbc" />
+        <package android:name="com.explusalpha.GbaEmu" />
+        <package android:name="com.explusalpha.GbcEmu" />
+        <package android:name="aenu.aps3e" />
+        <package android:name="aenu.aps3e.premium" />
+        <package android:name="com.armsx3" />
+        <package android:name="aenu.ax360e" />
+        <package android:name="aenu.ax360e.free" />
+        <package android:name="xendroid.compose" />
+        <package android:name="Ali.Xanite.green" />
+        <package android:name="Ali.Xanite" />
+        <package android:name="app.gamenative" />
+        <package android:name="emuready.gamehub.lite" />
+        <package android:name="gamehub.lite" />
+        <package android:name="com.limelight" />
     </queries>
 
     <application

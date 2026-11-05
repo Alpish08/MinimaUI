@@ -48,11 +48,11 @@ object BentoLayouts {
         BentoSlot(1289.dp, 445.dp, 344.dp, 344.dp, TileSize.Medium),
     )
 
-    /** The Apps page: 212dp round icons in rows of 3, 4 and 3 (screen coordinates, top-left corners). */
+    /** The Apps page: 212dp round icons in rows of 3, 4 and 3 (screen coordinates, top-left corners), 367 apart across (12 more than the 355 it had). */
     val Apps: List<BentoSlot> = listOf(
-        605f to 272f, 960f to 272f, 1315f to 272f,
-        428f to 535f, 783f to 535f, 1138f to 535f, 1493f to 535f,
-        605f to 798f, 960f to 798f, 1315f to 798f,
+        593f to 272f, 960f to 272f, 1327f to 272f,
+        409.5f to 535f, 776.5f to 535f, 1143.5f to 535f, 1510.5f to 535f,
+        593f to 798f, 960f to 798f, 1327f to 798f,
     ).map { (cx, cy) -> BentoSlot((cx - 106f).dp, (cy - 106f).dp, 212.dp, 212.dp, TileSize.Medium) }
 }
 

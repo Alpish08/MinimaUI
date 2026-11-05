@@ -33,7 +33,7 @@ When nothing has been touched for 30 seconds the focus glow and the scrolling ti
 * **Search** (L2 + R2): type with MinimaUI's own on-screen keyboard (letters and a number pad), or with the touch screen.
 * **Edit Mode**: rearrange favorites, platforms and apps; remove games from the library (and bring them back from the *Hidden Games* page of *Edit Current Platform*, in Edit Mode on All Games).
 * **Per-game and per-platform emulators**: pick any installed app as the emulator, or go back to the original.
-* **Platform tiles** show the platform's name as text; give a platform its own title or image if you like.
+* **Platform tiles** show the platform's logo from `MinimaUI/Platform Icons/` when it has one (named like the console, e.g. `Sony Playstation.png`), otherwise its name as text; give a platform its own title or image if you like. A platform shows on All Games while it has games (Android and Steam always); switch any platform on or off by hand in Customization (in Edit Mode on All Games or Favorites).
 * Optional animated wave, background music, UI sounds, your own boot animation, settings backups, and an ambient clock.
 * Touch, buttons or both.
 
@@ -52,6 +52,17 @@ More platforms and emulators will be added as feedback comes in, so please tell 
 | PS2 | `.chd .iso` | ArmSX2 / AetherSX2 / NetherSX2 |
 | PS Vita | `.psvita` (a text file holding the game's title id) | Vita3K |
 | Xbox | `.xiso .iso` | HakuX |
+| PS1 | `.chd .cue .pbp .iso .m3u` | DuckStation |
+| PS3 | `.iso`, or a `.ps3` file named after the game's serial and holding it (an installed game) | aPS3e, ARMSX3 |
+| Xbox 360 | `.iso .xex .zar` | aX360e, XenDroid, Xenra |
+| GameCube | `.iso .gcm .rvz .gcz .ciso .wia .tgc .dol` | Dolphin |
+| Wii | `.iso .wbfs .rvz .wia .wad .gcz .ciso .dol` | Dolphin |
+| Nintendo 64 | `.n64 .z64 .v64 .ndd .zip` | Mupen64Plus FZ |
+| Nintendo DS | `.nds .dsi .zip` | melonDS, DraStic, NooDS |
+| Game Boy / Color / Advance | `.gb .gbc .gba .zip` | Pizza Boy, My Boy / My OldBoy, GBA.emu / GBC.emu |
+| Dreamcast | `.gdi .cdi .chd .cue .iso .m3u` | Flycast, Redream |
+
+The PS1, PS3, Xbox 360, GameCube, Wii, N64, DS, Game Boy and Dreamcast entries come from ES-DE's published launch rules and have **not been tried on a device yet**: if one doesn't start, please open an issue with the emulator and its version.
 
 You can send any ROM game to a different emulator: *Start menu → Edit Current Game → Custom Emulator* (one game), or in the platform Edit Mode *Edit Current Platform → Default Emulator* (the whole platform). Press X on either to go back to the original.
 
@@ -62,7 +73,7 @@ MinimaUI does not include any games, BIOS files, emulators or artwork of the pla
 2. **Install the APK** from the [Releases](../../releases) page (allow "install unknown apps" for your browser or file manager).
 3. **Open MinimaUI** and allow **All files access** when asked. MinimaUI needs it to read your ROM folders and to keep its own `MinimaUI/` folder.
 4. **Make it your home app** (optional): Android Settings → Apps → Default apps → Home app → MinimaUI. Pressing Home then returns to it.
-5. **Add your ROM folders**: press **Start** → **ROMs Folder(s)** → the **+** pill, then pick the folder that holds your platform folders. Inside it, name one folder per platform: `PSP`, `PS2`, `Switch`, `3DS`, `WiiU`, `Vita` (or `PSV`), `Xbox`, `Android`, `Artemis` (the Windows `.art` files). Names are not case sensitive and spaces are ignored (`Nintendo Switch` works). Press **Y** on that screen to rescan whenever you add games.
+5. **Add your ROM folders**: press **Start** → **ROMs Folder(s)** → the **+** pill, then pick the folder that holds your platform folders. Inside it, name one folder per platform: `PSP`, `PS1`, `PS2`, `PS3`, `Switch`, `3DS`, `WiiU`, `Wii`, `GameCube`, `N64`, `DS`, `GBA` (or `GB`, `GBC`, `Game Boy`), `Dreamcast`, `Vita` (or `PSV`), `Xbox`, `Xbox360`, `Android`, `Artemis` (the Windows `.art` files). Names are not case sensitive and spaces are ignored (`Nintendo Switch` works). Press **Y** on that screen to rescan whenever you add games.
 6. **Add Android games and apps**: turn on **Edit Mode** (Start → Customization), then on All Games the Android and Steam rows end with a **+** (Steam games take a title and their GameHub id), and on the Apps page press **A** on an empty slot to pick an app.
 
 # Getting around (no first-time screen needed)
@@ -100,7 +111,7 @@ MinimaUI/
   Cover Art/         put your covers here and pick them from the menus
     Favorites/
     All Games/<platform>/
-  Platform Icons/    optional: your own platform images (create it yourself)
+  Platform Icons/    optional: your own platform images; a platform takes the one named after it (see the console-logos names below) until you pick another
   Logo.png           optional: your own logo for the bottom of Favorites
 ```
 
@@ -116,6 +127,8 @@ Sounds are not included. If you want a PS Vita feel, the community-made [PS Vita
 **Covers and platform icons** are not bundled: pick your own images with *Select Cover Image* and *Edit Current Platform → Select Platform Icon*. MinimaUI never downloads artwork or metadata.
 
 **Platform icons**: tiles show the platform's name as text until you pick an image. A big collection of console logos (many more consoles than MinimaUI supports yet) is in the [console-logos repository](https://github.com/PRO100BYTE/console-logos/tree/main/Recommended%20Versions%20%28Normal%29%20%281%20Per%20Platform%29%20v2.1). Download the ones you want (check that repository for its terms), put them in `MinimaUI/Platform Icons/`, then in Edit Mode on the All Games page open the Start menu → *Edit Current Platform → Select Platform Icon* and pick the image. The logos belong to their owners.
+
+**Steam launchers**: besides GameHub, a Steam game can be started by GameNative (by its Steam App ID) or GameHub Lite: choose the app as the game's *Custom Emulator*, or for the whole Steam platform in Edit Mode (*Edit Current Platform → Default Emulator*). Games pinned from Moonlight ("Add to home screen") show up under Windows, like the Artemis ones. Neither launcher has been tried on a device yet.
 
 # The wave
 The first time you run MinimaUI the XMB wave is on, in the author's own look. Change it in *Start → Customization → XMB Wave* (OFF, ON = the original wave, CUSTOM = the MinimaUI ribbon). With CUSTOM selected you can randomize it (**X**) and save the current look (**Y**) as a file in `MinimaUI/Backup/Custom Wave/`; restore one from *Backup / Restore*. The files are plain `key = value` text, so you can also tune them by hand.

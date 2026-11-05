@@ -219,7 +219,6 @@ class MainActivity : ComponentActivity() {
                                 roms + PinnedShortcuts(store).games() + AndroidGames(store).games() + gameHub.games()
                             }
                         )
-                        autoHideEmptyPlatforms()
                         rescanBefore?.let { known ->
                             library.reportRescan((library.scannedGameIds() - known).size)
                             rescanBefore = null
@@ -277,6 +276,8 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         com.minimaui.app.overlay.LevelOverlayService.homeActive = true
         com.minimaui.app.overlay.LevelOverlayService.onRestartRequested = ::restartHome
+        // Platform images dropped into MinimaUI/Platform Icons show up without a restart.
+        library.refreshDefaultIcons()
         // Coming back (screen on, or from another app): ask again for the fast mode, going through "no preference" first so
         // the window manager really applies it after a dimmed, 60 Hz stay.
         applyRefreshRate()
@@ -318,36 +319,9 @@ class MainActivity : ComponentActivity() {
         }, 200L)
     }
 
-    /**
-     * Platforms with no games used to switch themselves off and come back on when games appeared again (Android and Steam
-     * stayed, since their games are added by hand). That is off now ([AUTO_HIDE_EMPTY_PLATFORMS]): platforms are only
-     * switched on and off by hand, in the Customization menu.
-     */
-    private fun autoHideEmptyPlatforms() {
-        if (!AUTO_HIDE_EMPTY_PLATFORMS) return
-        val autoHidden = store.loadList(KEY_AUTO_HIDDEN).toMutableSet()
-        for (platform in library.platforms) {
-            if (platform.id == "android" || platform.id == "steam") {
-                // Never hidden automatically (their games are added by hand), but undo an earlier automatic hide.
-                if (autoHidden.remove(platform.id)) settings.setPlatformEnabled(platform.id, true)
-                continue
-            }
-            val hasGames = library.gamesFor(platform).isNotEmpty()
-            if (!hasGames && settings.isPlatformEnabled(platform.id)) {
-                settings.setPlatformEnabled(platform.id, false)
-                autoHidden += platform.id
-            } else if (hasGames && autoHidden.remove(platform.id)) {
-                settings.setPlatformEnabled(platform.id, true)
-            }
-        }
-        store.saveList(KEY_AUTO_HIDDEN, autoHidden.toList())
-    }
-
     private companion object {
         /** The boot logo plays once per process, not every time the home screen comes back. */
         private var bootPlayed = false
-        const val AUTO_HIDE_EMPTY_PLATFORMS = false
-        const val KEY_AUTO_HIDDEN = "autoHiddenPlatforms"
         const val KEY_LAUNCHED_AT = "launchedAt"
         const val HOME_SOUND_MIN_AWAY_MS = 4_000L
         const val IDLE_DIM_MS = 30_000L

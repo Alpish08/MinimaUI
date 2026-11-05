@@ -48,7 +48,10 @@ class Settings(platforms: List<Platform>, private val store: LibraryStore) {
     var bootVideoUri by mutableStateOf(store.loadString(KEY_BOOT_VIDEO))
         private set
 
-    private val enabledPlatforms = mutableStateListOf<String>()
+    // The user's own say on which platforms show up on All Games: switched on by hand (shown even without games) or off by hand
+    // (hidden even with games). A platform with neither shows while it has games.
+    private val forcedOn = mutableStateListOf<String>()
+    private val forcedOff = mutableStateListOf<String>()
 
     /** The order of the platforms in All Games (the user can rearrange it in Edit Mode); starts alphabetical. */
     val platformOrder = mutableStateListOf<String>()
@@ -62,8 +65,16 @@ class Settings(platforms: List<Platform>, private val store: LibraryStore) {
 
     init {
         val known = platforms.map { it.id }.toSet()
-        val seeded = store.loadEnabledPlatforms() ?: known
-        enabledPlatforms.addAll(seeded.filter { it in known })
+        forcedOn.addAll(store.loadList(KEY_FORCED_ON).filter { it in known })
+        forcedOff.addAll(store.loadList(KEY_FORCED_OFF).filter { it in known })
+        // Before 2.4 every platform was either on or off by hand: the ones the user had switched off stay off, the rest follow their games.
+        if (!store.loadFlag(KEY_PLATFORM_RULES, false)) {
+            store.loadEnabledPlatforms()?.let { oldOn ->
+                forcedOff.addAll(OLD_PLATFORMS.filter { it in known && it !in oldOn && it !in forcedOff })
+                store.saveList(KEY_FORCED_OFF, forcedOff)
+            }
+            store.saveFlag(KEY_PLATFORM_RULES, true)
+        }
         romFolders.addAll(store.loadList(KEY_ROM_FOLDERS))
         val saved = store.loadList(KEY_PLATFORM_ORDER).filter { it in known }
         // Platforms missing from the saved order (a new one) go after it, alphabetically.
@@ -97,15 +108,19 @@ class Settings(platforms: List<Platform>, private val store: LibraryStore) {
         store.saveList(KEY_ROM_FOLDERS, romFolders)
     }
 
-    fun isPlatformEnabled(id: String): Boolean = id in enabledPlatforms
+    /** The user's own choice for a platform: true = shown even without games, false = hidden, null = shown while it has games. */
+    fun platformOverride(id: String): Boolean? = if (id in forcedOn) true else if (id in forcedOff) false else null
 
-    fun setPlatformEnabled(id: String, enabled: Boolean) {
-        if (enabled) {
-            if (id !in enabledPlatforms) enabledPlatforms.add(id)
-        } else {
-            enabledPlatforms.remove(id)
+    fun setPlatformOverride(id: String, shown: Boolean?) {
+        forcedOn.remove(id)
+        forcedOff.remove(id)
+        when (shown) {
+            true -> forcedOn.add(id)
+            false -> forcedOff.add(id)
+            null -> Unit
         }
-        store.saveEnabledPlatforms(enabledPlatforms.toSet())
+        store.saveList(KEY_FORCED_ON, forcedOn)
+        store.saveList(KEY_FORCED_OFF, forcedOff)
     }
 
     fun setCustomBgm(uri: String?) {
@@ -200,6 +215,11 @@ class Settings(platforms: List<Platform>, private val store: LibraryStore) {
         private const val KEY_BOOT_VIDEO = "bootVideo"
         private const val KEY_VOLUME = "volume"
         private const val KEY_PLATFORM_ORDER = "platformOrder"
+        private const val KEY_FORCED_ON = "platformsForcedOn"
+        private const val KEY_FORCED_OFF = "platformsForcedOff"
+        private const val KEY_PLATFORM_RULES = "platformRulesV2"
+        /** The platforms that existed before the on-by-games rule. */
+        private val OLD_PLATFORMS = listOf("psp", "steam", "switch", "android", "vita", "ps2", "n3ds", "wiiu", "xbox", "windows")
         private const val KEY_SORT_RECENT = "sortByRecent"
 
         /** Storage-access tree URIs encode "volume:path"; show that, like "1234-ABCD:ROMs/psv". */

@@ -133,6 +133,15 @@ private val LogoWidths = mapOf(
     "wiiu" to 400f,
     "xbox" to 560f,
     "windows" to 480f,
+    "ps1" to 484f,
+    "ps3" to 440f,
+    "gc" to 500f,
+    "wii" to 380f,
+    "n64" to 440f,
+    "nds" to 560f,
+    "gb" to 520f,
+    "dreamcast" to 520f,
+    "xbox360" to 520f,
 )
 
 // Corner radius as a fraction of tile height, picked to echo each logo's own shape (1/2 = a pill).
@@ -148,6 +157,15 @@ private val CornerRatios = mapOf(
     "switch" to 0.40f,
     "android" to 0.50f,
     "steam" to 0.50f,
+    "ps1" to 0.20f,
+    "ps3" to 0.22f,
+    "gc" to 0.24f,
+    "wii" to 0.30f,
+    "n64" to 0.24f,
+    "nds" to 0.22f,
+    "gb" to 0.24f,
+    "dreamcast" to 0.20f,
+    "xbox360" to 0.24f,
 )
 
 private fun logoWidth(platform: Platform) = (LogoWidths[platform.id] ?: DefaultLogoWidth) * RowScale
