@@ -57,7 +57,6 @@ import com.minimaui.app.ui.theme.Dimens
 import com.minimaui.app.ui.theme.MenuPanelFill
 import com.minimaui.app.ui.theme.MenuPillActive
 import com.minimaui.app.ui.theme.MenuPillIdle
-import com.minimaui.app.ui.theme.MenuScrim
 import com.minimaui.app.ui.theme.TextDim
 import com.minimaui.app.ui.theme.TextPrimary
 
@@ -148,7 +147,6 @@ fun SearchDialog(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MenuScrim)
             // Touch: drag up or down to scroll the results.
             .verticalDragSteps(ResultPitch) { onStepResults(it) }
             // Touch: tap a result to open it, tap outside the panel to close.

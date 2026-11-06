@@ -17,6 +17,7 @@ import com.minimaui.app.model.AppLibrary
 import com.minimaui.app.data.InstalledApp
 import com.minimaui.app.ui.components.WaveOriginal
 import com.minimaui.app.ui.components.WaveRibbon
+import com.minimaui.app.ui.components.WaveMinima
 import com.minimaui.app.ui.menu.PickerColumns
 import com.minimaui.app.model.GameEntry
 import com.minimaui.app.model.Library
@@ -900,7 +901,10 @@ class HomeState(
                     (if (menuAction < settings.romFolders.size) listOf(ControlHint("X", "Remove Selected Folder")) else emptyList()) +
                         ControlHint("Y", "Rescan") + base
                 MenuCategory.Customize ->
-                    if (menuPage == 0 && menuAction == WaveRow) listOf(ControlHint("X", "Randomize"), ControlHint("Y", "Save Current")) + base
+                    if (menuPage == 0 && menuAction == WaveRow) when (settings.waveStyle) {
+                        WaveRibbon -> listOf(ControlHint("X", "Randomize"), ControlHint("Y", "Save Current")) + base
+                        else -> base
+                    }
                     else base
                 else -> base
             }
@@ -922,7 +926,7 @@ class HomeState(
         }
     }
 
-    private fun waveLabel(style: Int) = when (style) { WaveOriginal -> "ON"; WaveRibbon -> "CUSTOM"; else -> "OFF" }
+    private fun waveLabel(style: Int) = when (style) { WaveOriginal -> "ORIGINAL"; WaveRibbon -> "CUSTOM"; WaveMinima -> "MINIMA"; else -> "OFF" }
 
     private fun onOff(value: Boolean) = if (value) "ON" else "OFF"
 
@@ -1633,7 +1637,7 @@ class HomeState(
             Key.ButtonY ->
                 if (!isRepeat && !inCategories) {
                     if (menuCategory == MenuCategory.RomFolders) actions.rescan()
-                    else if (menuCategory == MenuCategory.Customize && menuPage == 0 && menuAction == WaveRow) actions.saveWave()
+                    else if (menuCategory == MenuCategory.Customize && menuPage == 0 && menuAction == WaveRow && settings.waveStyle == WaveRibbon) actions.saveWave()
                 }
             Key.ButtonL1 -> if (!isRepeat) changeMenuPage(-1)
             Key.ButtonR1 -> if (!isRepeat) changeMenuPage(1)
@@ -1756,7 +1760,7 @@ class HomeState(
     /** The X button: removes the selected ROM folder from the list. */
     private fun performSecondaryAction() {
         when (menuCategory) {
-            MenuCategory.Customize -> if (menuPage == 0 && menuAction == WaveRow) settings.randomizeWave()
+            MenuCategory.Customize -> if (menuPage == 0 && menuAction == WaveRow && settings.waveStyle == WaveRibbon) settings.randomizeWave()
             MenuCategory.EditGame -> if (menuPage == 0) removeEditItem(editItems.getOrNull(menuAction))
             MenuCategory.RomFolders -> {
                 settings.removeRomFolder(menuAction)

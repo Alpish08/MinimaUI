@@ -43,7 +43,6 @@ import com.minimaui.app.ui.theme.Dimens
 import com.minimaui.app.ui.theme.MenuPanelFill
 import com.minimaui.app.ui.theme.MenuPillActive
 import com.minimaui.app.ui.theme.MenuPillIdle
-import com.minimaui.app.ui.theme.MenuScrim
 import com.minimaui.app.ui.theme.TextDim
 import com.minimaui.app.ui.theme.TextPrimary
 
@@ -105,7 +104,6 @@ fun FolderChooser(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MenuScrim)
             .verticalDragSteps(110f) { onStepRows(it) }
             .pointerInput(rowCount, top) {
                 detectTapGestures { offset ->

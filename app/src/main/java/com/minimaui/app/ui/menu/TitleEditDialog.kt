@@ -43,7 +43,6 @@ import com.minimaui.app.ui.theme.Dimens
 import com.minimaui.app.ui.theme.MenuPanelFill
 import com.minimaui.app.ui.components.FocusRing
 import com.minimaui.app.ui.theme.MenuPillIdle
-import com.minimaui.app.ui.theme.MenuScrim
 import com.minimaui.app.ui.theme.TextPrimary
 import com.minimaui.app.ui.theme.TileSurfaceFocused
 
@@ -79,7 +78,7 @@ fun TitleEditDialog(
         return
     }
 
-    Box(modifier = modifier.fillMaxSize().background(MenuScrim)) {
+    Box(modifier = modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
                 .offset(410.dp, 24.dp)
@@ -152,7 +151,7 @@ private fun SearchStyleEntry(
     modifier: Modifier,
 ) {
     val panelShape = RoundedCornerShape(Dimens.PanelCorner)
-    Box(modifier = modifier.fillMaxSize().background(MenuScrim)) {
+    Box(modifier = modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
                 .offset(502.dp, 94.dp)

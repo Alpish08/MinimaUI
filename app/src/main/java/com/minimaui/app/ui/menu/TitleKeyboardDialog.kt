@@ -39,7 +39,6 @@ import com.minimaui.app.ui.components.progressiveBlur
 import com.minimaui.app.ui.components.unfocusedOutline
 import com.minimaui.app.ui.components.withHalfRateFrames
 import com.minimaui.app.ui.theme.MenuPillIdle
-import com.minimaui.app.ui.theme.MenuScrim
 import com.minimaui.app.ui.theme.TextPrimary
 import kotlinx.coroutines.delay
 
@@ -68,7 +67,6 @@ fun TitleKeyboardDialog(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MenuScrim)
             // Touch: a tap on the keyboard presses the key.
             .pointerInput(digits) {
                 detectTapGestures { offset ->

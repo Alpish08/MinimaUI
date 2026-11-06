@@ -1,5 +1,6 @@
 package com.minimaui.app.ui.favorites
 
+import com.minimaui.app.ui.components.LocalSeeThrough
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.runtime.getValue
 import com.minimaui.app.ui.components.backgroundOutline
@@ -158,7 +159,7 @@ fun BentoScreen(
                 .offset(Dimens.PanelX, Dimens.PanelY)
                 .size(Dimens.PanelWidth, Dimens.PanelHeight)
                 .clip(panelShape)
-                .background(SurfacePanel)
+                .background(SurfacePanel.copy(alpha = LocalSeeThrough.current))
                 .backgroundOutline(depth = 24.dp, corner = Dimens.FavoritesPanelCorner)
         ) {
             HorizontalPager(

@@ -25,7 +25,6 @@ import com.minimaui.app.ui.components.MarqueeText
 import com.minimaui.app.ui.theme.Dimens
 import com.minimaui.app.ui.theme.MenuPanelFill
 import com.minimaui.app.ui.theme.MenuPillIdle
-import com.minimaui.app.ui.theme.MenuScrim
 import com.minimaui.app.ui.theme.TextPrimary
 
 /** The SELECT-button card: a game's title, time played, favorite state and platform. */
@@ -44,7 +43,7 @@ fun GameDetailsDialog(
         "Favorite: ${if (favorite) "Yes" else "No"}",
         "Platform: $platform",
     )
-    Box(modifier = modifier.fillMaxSize().background(MenuScrim)) {
+    Box(modifier = modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
                 .offset(416.dp, 280.dp)

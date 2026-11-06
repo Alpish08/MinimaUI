@@ -30,6 +30,8 @@ const val WaveButtonRipples = false
 const val WaveOff = 0
 const val WaveOriginal = 1
 const val WaveRibbon = 2
+/** The Minima wave: a full-screen background (see [MinimaWave]), behind every page, Favorites included. */
+const val WaveMinima = 3
 
 /** How bright the original wave is behind the Apps page (the icons stay in front); the ribbon isn't dimmed. */
 const val AppsWaveBrightness = 0.66f
@@ -375,6 +377,117 @@ fun XmbWave(style: Int, modifier: Modifier = Modifier, config: WaveConfig = Wave
             }
             shader.setInputShader("rip", rippleShaders[rippleTurn[0]])
             shader.setFloatUniform("np", alive.toFloat())
+            drawRect(ShaderBrush(shader))
+        }
+    )
+}
+
+/** How bright the Minima wave is behind the Apps page, and behind Favorites (where it is also blurred by [MinimaFavoritesSoft]). */
+const val MinimaAppsDim = 0.6f
+const val MinimaFavoritesDim = 0.5f
+const val MinimaFavoritesSoft = 4.5f
+
+/** The Minima wave starts this many seconds (at most) into its motion, so it doesn't look the same after every restart. */
+private const val MinimaStartSpread = 600f
+
+// The Minima wave, after the PS Vita home screen's wave in MinimaUI's colours: OLED black, a wide soft glow across the lower third with a pale core, and six white
+// satin sheets woven through it, one of them in MinimaUI's red. Each sheet has a glossy edge and a soft body under it; the back
+// ones are softer, fainter and slower than the front ones, and a sheen slides slowly along the band. Everything is measured on a
+// 720 px tall screen (so it looks the same at any size). [dim] darkens it all (Apps, Favorites); [soft] above 1 blurs it (Favorites).
+private val MinimaAgsl = """
+uniform float2 size;
+uniform float time;
+uniform float dim;
+uniform float soft;
+
+const float3 bgMid = float3(0.0);
+const float3 bgLow = float3(0.0);
+const float3 bgCorner = float3(0.0);
+const float3 sheetC = float3(0.949, 0.949, 0.957);
+const float3 coreC = float3(0.863, 0.863, 0.886);
+const float3 under = float3(0.290, 0.294, 0.322);
+const float3 red = float3(1.0, 0.227, 0.227);
+
+float wave(float x, float t, float k, float a) {
+    return a * (0.55 * sin(x * 2.1 + t * 0.19 + k) + 0.30 * sin(x * 3.7 - t * 0.13 + k * 1.7) + 0.15 * sin(x * 6.3 + t * 0.23 + k * 0.6));
+}
+
+half4 main(float2 p) {
+    float2 uv = p / size;
+    float ar = size.x / size.y;
+    float x = uv.x * ar;
+    float t = time;
+    float yc = 0.71 - 0.05 * uv.x + wave(x, t * 0.6, 0.0, 0.035);
+    float sx = mod(t * 0.07, ar + 1.6) - 0.8;
+    float sheen = exp(-(x - sx) * (x - sx) / 0.30);
+    float3 col = mix(float3(0.0), bgMid, smoothstep(0.0, 0.55, uv.y));
+    col = mix(col, bgLow, smoothstep(0.85, 1.0, uv.y));
+    float cx = uv.x - 1.05;
+    float cy = uv.y + 0.05;
+    col += bgCorner * exp(-(cx * cx * 2.2 + cy * cy * 6.0));
+    float dc = uv.y - yc;
+    // Black again well above and below the band.
+    col *= 1.0 - 0.6 * max(smoothstep(-0.05, -0.42, dc), smoothstep(0.12, 0.40, dc) * 0.85);
+    float g = dc < 0.0 ? exp(-dc * dc / (0.00405 * soft)) : exp(-dc * dc / (0.0198 * soft));
+    col = mix(col, under, clamp(g * 0.7, 0.0, 1.0));
+    float core = exp(-dc * dc / (0.00144 * soft * (1.0 + 0.5 * sheen))) * (0.72 + 0.22 * sin(x * 1.1 - t * 0.1) + 0.25 * sheen);
+    col = mix(col, coreC, clamp(core * 0.68, 0.0, 1.0));
+    for (int i = 0; i < 6; i++) {
+        float fi = float(i);
+        float z = fi / 5.0;
+        float off = (fi - 2.5) * 0.028;
+        float yi = yc + off * (0.7 + 0.6 * sin(x * 1.3 + fi * 1.1 + t * 0.05)) + wave(x * 1.15 + fi * 0.7, t * mix(0.62, 1.3, z), fi * 2.4, 0.03 + 0.008 * fi);
+        float d = uv.y - yi;
+        float dp = d * 720.0;
+        // Depth of field focused on the red sheet: the further a sheet is from it, the blurrier (and dimmer) its line.
+        float f = abs(z - 0.6) / 0.6;
+        float sig = mix(3.6, 38.0, f * f) * soft * soft;
+        float body = d > 0.0 ? exp(-d / ((0.035 + 0.02 * mod(fi, 3.0)) * soft)) : 0.0;
+        // A light trail: a thin bright core with a wide soft halo around it.
+        float edgeL = exp(-dp * dp / sig) * mix(0.95, 0.5, f) + exp(-dp * dp / ((260.0 + 500.0 * f) * soft * soft)) * 0.2;
+        float s = 0.5 + 0.5 * sin(x * 2.4 - t * 0.35 + fi * 1.9);
+        float a = (body * (0.07 + 0.05 * s + 0.05 * sheen) + edgeL * (0.22 + 0.45 * s * s + 0.55 * sheen)) * 0.9 / mix(1.0, soft, 0.5);
+        bool isRed = i == 3;
+        col = mix(col, isRed ? red : sheetC, clamp(a * mix(0.55, 1.0, z) * (isRed ? 1.6 : 1.0), 0.0, 1.0));
+    }
+    float sd = (uv.y - (yc - 0.012)) * 720.0;
+    col = mix(col, float3(1.0), clamp(sheen * exp(-sd * sd / (30.0 * soft)) * 0.32, 0.0, 1.0));
+    col *= dim;
+    float n = fract(52.9829189 * fract(dot(p, float2(0.06711056, 0.00583715))));
+    col += (n - 0.5) / 255.0;
+    return half4(half3(clamp(col, 0.0, 1.0)), 1.0);
+}
+"""
+
+/**
+ * The Minima wave behind every page. [dim] scales its brightness (1 on All Games, lower on Apps and Favorites) and [soft]
+ * blurs it (1 sharp; Favorites more). Same frame pace and idle freeze as the other waves.
+ */
+@Composable
+fun MinimaWave(dim: Float, soft: Float, modifier: Modifier = Modifier) {
+    val shader = remember { RuntimeShader(MinimaAgsl) }
+    val resting by rememberUpdatedState(LocalResting.current)
+    var time by remember { mutableFloatStateOf(kotlin.random.Random.nextFloat() * MinimaStartSpread) }
+    LaunchedEffect(Unit) {
+        var last = 0L
+        while (true) {
+            withFrameNanos { now ->
+                if (last != 0L) time += ((now - last) / 1e9f).coerceAtMost(0.25f)
+                last = now
+            }
+            delay(1000L / WaveFps - 4L)
+            if (resting) {
+                snapshotFlow { resting }.first { !it }
+                last = 0L
+            }
+        }
+    }
+    Box(
+        modifier.drawBehind {
+            shader.setFloatUniform("size", size.width, size.height)
+            shader.setFloatUniform("time", time)
+            shader.setFloatUniform("dim", dim)
+            shader.setFloatUniform("soft", soft.coerceAtLeast(1f))
             drawRect(ShaderBrush(shader))
         }
     )

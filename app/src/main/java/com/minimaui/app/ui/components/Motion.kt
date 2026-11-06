@@ -26,6 +26,8 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
@@ -166,12 +168,17 @@ fun cascade(arrival: Float, index: Int): Float {
     return t * t * (3f - 2f * t)
 }
 
-/** For overlays inside an AnimatedVisibility: they come into focus from a soft blur and a slightly smaller size. */
+/**
+ * For overlays inside an AnimatedVisibility: they come into focus from a soft blur and a slightly smaller size. With [scrim]
+ * the screen behind dims as well; the dim always covers the whole screen (it only fades), so its edges never show while the
+ * overlay grows into place (they would over the Minima wave).
+ */
 @Composable
-fun AnimatedVisibilityScope.OverlayMotion(content: @Composable () -> Unit) {
+fun AnimatedVisibilityScope.OverlayMotion(scrim: Boolean = false, content: @Composable () -> Unit) {
     val amount by transition.animateFloat(transitionSpec = { tween(240, easing = EaseInOut) }, label = "overlayMotion") {
         if (it == EnterExitState.Visible) 0f else 1f
     }
+    if (scrim) Box(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - amount }.background(com.minimaui.app.ui.theme.MenuScrim))
     Box(
         Modifier
             .progressiveBlur(maxBlur = 22.dp) { amount }

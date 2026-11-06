@@ -34,7 +34,6 @@ import com.minimaui.app.ui.components.UnfocusedOutline
 import com.minimaui.app.ui.components.softOutline
 import com.minimaui.app.ui.theme.Dimens
 import com.minimaui.app.ui.theme.MenuPanelFill
-import com.minimaui.app.ui.theme.MenuScrim
 
 /** What the Favorites launcher tile offers: Folders, Recently Played, Random Game, Settings, Apps, Search (a 3x2 grid). */
 const val MoreMenuEntries = 6
@@ -72,7 +71,6 @@ fun FavoritesMoreMenu(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MenuScrim)
             .pointerInput(Unit) {
                 detectTapGestures { offset ->
                     val x = offset.x / density

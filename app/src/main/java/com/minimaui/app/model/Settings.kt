@@ -20,9 +20,13 @@ class Settings(platforms: List<Platform>, private val store: LibraryStore) {
     var shuffleMusic by mutableStateOf(store.loadFlag(KEY_SHUFFLE_MUSIC, false))
         private set
 
-    /** The animated wave behind the All Games and Apps pages: 0 off, 1 the original wave (ON), 2 the Minima ribbon (CUSTOM, see [WaveConfig]). */
+    /**
+     * The animated wave behind the pages: 0 off, 1 the original wave (ORIGINAL), 2 the Minima ribbon (CUSTOM, see [WaveConfig]),
+     * 3 the Minima wave (MINIMA).
+     */
     var waveStyle by mutableIntStateOf(loadWaveStyle())
         private set
+
 
     /** The look of the XMB wave (see [WaveConfig]); saved as its text form, so a randomized look survives restarts and goes into backups. */
     var wave by mutableStateOf(store.loadString(KEY_WAVE)?.let(WaveConfig::parse) ?: WaveConfig.Default)
@@ -161,13 +165,14 @@ class Settings(platforms: List<Platform>, private val store: LibraryStore) {
     }
 
     private fun loadWaveStyle(): Int =
-        store.loadString(KEY_WAVE_STYLE)?.toIntOrNull()?.takeIf { it in 0..2 } ?: if (store.loadFlag(KEY_XMB_WAVE, false)) 1 else 2
+        store.loadString(KEY_WAVE_STYLE)?.toIntOrNull()?.takeIf { it in 0 until WaveStyleCount } ?: if (store.loadFlag(KEY_XMB_WAVE, false)) 1 else 2
 
-    /** OFF -> ON (the original wave) -> CUSTOM (the Minima ribbon) -> OFF. A fresh install starts on CUSTOM. */
+    /** OFF -> ORIGINAL (the original wave) -> CUSTOM (the Minima ribbon) -> MINIMA -> OFF. A fresh install starts on CUSTOM. */
     fun cycleWaveStyle() {
-        waveStyle = (waveStyle + 1) % 3
+        waveStyle = (waveStyle + 1) % WaveStyleCount
         store.saveString(KEY_WAVE_STYLE, waveStyle.toString())
     }
+
 
     /** Puts a saved custom wave in place and shows it (the wave switches to CUSTOM). */
     fun applyWave(config: WaveConfig) {
@@ -202,6 +207,7 @@ class Settings(platforms: List<Platform>, private val store: LibraryStore) {
         private const val KEY_XMB_WAVE = "xmbWave"
         private const val KEY_WAVE = "waveConfig"
         private const val WaveRibbonStyle = 2
+        private const val WaveStyleCount = 4
         private const val KEY_WAVE_STYLE = "waveStyle"
         private const val KEY_TOUCH_GESTURES = "touchGestures"
         private const val KEY_UI_FPS = "uiFps"

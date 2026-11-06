@@ -52,7 +52,6 @@ import com.minimaui.app.ui.components.MarqueeText
 import com.minimaui.app.ui.components.SelectionGlow
 import com.minimaui.app.ui.theme.Dimens
 import com.minimaui.app.ui.theme.MenuPanelFill
-import com.minimaui.app.ui.theme.MenuScrim
 import com.minimaui.app.ui.theme.TextPrimary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -108,7 +107,6 @@ fun AppPicker(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MenuScrim)
             // Touch: tap an app to add it, tap outside the panel to close, swipe up/down to scroll by a row.
             .pointerInput(items.size) {
                 detectTapGestures { offset ->

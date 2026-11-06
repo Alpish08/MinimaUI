@@ -82,6 +82,13 @@ import com.minimaui.app.ui.components.WavePulses
 import com.minimaui.app.ui.components.WaveButtonRipples
 import com.minimaui.app.ui.components.WaveRibbon
 import com.minimaui.app.ui.components.XmbWave
+import com.minimaui.app.ui.components.MinimaWave
+import com.minimaui.app.ui.components.LocalSeeThrough
+import com.minimaui.app.ui.components.MinimaPanelSeeThrough
+import com.minimaui.app.ui.components.WaveMinima
+import com.minimaui.app.ui.components.MinimaAppsDim
+import com.minimaui.app.ui.components.MinimaFavoritesDim
+import com.minimaui.app.ui.components.MinimaFavoritesSoft
 import com.minimaui.app.ui.components.ProvideFocusPulse
 import com.minimaui.app.ui.components.LevelBackdrop
 import com.minimaui.app.ui.components.LevelCenterX
@@ -347,6 +354,7 @@ fun HomeRoot(
     }
 
     ProvideFocusPulse(dimmed, idle) {
+    CompositionLocalProvider(LocalSeeThrough provides if (settings.waveStyle == WaveMinima) MinimaPanelSeeThrough else 1f) {
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -508,7 +516,20 @@ fun HomeRoot(
             if (ribbon && ribbonLevel > 0.001f) {
                 XmbWave(style = WaveRibbon, config = settings.wave, brightness = ribbonLevel, pulses = pulses, modifier = Modifier.fillMaxSize())
             }
-            val pageWave = if (ribbon) WaveOff else settings.waveStyle
+            // The Minima wave fills the screen behind every page: full on All Games, dimmer behind Apps, dimmer and blurred behind Favorites.
+            val vita = settings.waveStyle == WaveMinima
+            val vitaDim by animateFloatAsState(
+                when (shownPage) {
+                    HomePage.AllGames -> 1f
+                    HomePage.Apps -> MinimaAppsDim
+                    HomePage.Favorites -> MinimaFavoritesDim
+                },
+                tween(350),
+                label = "vitaDim"
+            )
+            val vitaSoft by animateFloatAsState(if (shownPage == HomePage.Favorites) MinimaFavoritesSoft else 1f, tween(350), label = "vitaSoft")
+            if (vita) MinimaWave(dim = vitaDim, soft = vitaSoft, modifier = Modifier.fillMaxSize())
+            val pageWave = if (ribbon || vita) WaveOff else settings.waveStyle
             BlurFadeSwitch(
                 targetState = shownPage,
                 // Favorites is home: the libraries are one step in (and back out again); All Games and Apps lie side by side.
@@ -571,6 +592,7 @@ fun HomeRoot(
                         platformTitle = library::platformTitle,
                         wave = pageWave,
                         ribbon = ribbon,
+                        coloredBackground = vita,
                         pressTick = state.pressTick,
                         editMode = state.editMode,
                         held = state.held,
@@ -637,7 +659,7 @@ fun HomeRoot(
             enter = fadeIn(tween(160)),
             exit = fadeOut(tween(120))
         ) {
-            OverlayMotion {
+            OverlayMotion(scrim = true) {
                 MenuOverlay(
                     category = state.menuCategory,
                     focus = state.menuFocus,
@@ -663,7 +685,7 @@ fun HomeRoot(
             enter = fadeIn(tween(160)),
             exit = fadeOut(tween(120))
         ) {
-            OverlayMotion {
+            OverlayMotion(scrim = true) {
                 AppPicker(
                     title = state.pickerTitle,
                     items = state.pickerItems,
@@ -684,7 +706,7 @@ fun HomeRoot(
         ) {
             val game = state.detailsGame
             if (game != null) {
-                OverlayMotion {
+                OverlayMotion(scrim = true) {
                     GameDetailsDialog(
                         title = game.title,
                         hoursPlayed = state.playTimeText(game),
@@ -701,7 +723,7 @@ fun HomeRoot(
             enter = fadeIn(tween(160)),
             exit = fadeOut(tween(120))
         ) {
-            OverlayMotion {
+            OverlayMotion(scrim = true) {
                 SearchDialog(
                     query = state.searchQuery,
                     results = state.searchHits.map { it.title },
@@ -725,7 +747,7 @@ fun HomeRoot(
             enter = fadeIn(tween(160)),
             exit = fadeOut(tween(120))
         ) {
-            OverlayMotion {
+            OverlayMotion(scrim = true) {
                 FavoritesMoreMenu(
                     selected = state.moreIndex,
                     hints = state.moreHints,
@@ -740,7 +762,7 @@ fun HomeRoot(
             enter = fadeIn(tween(160)),
             exit = fadeOut(tween(120))
         ) {
-            OverlayMotion {
+            OverlayMotion(scrim = true) {
                 FolderChooser(
                     title = state.folderPickerTitle,
                     names = state.folderNames,
@@ -764,7 +786,7 @@ fun HomeRoot(
             enter = fadeIn(tween(160)),
             exit = fadeOut(tween(120))
         ) {
-            OverlayMotion {
+            OverlayMotion(scrim = true) {
                 if (ownEntry.value) {
                     TitleKeyboardDialog(
                         heading = entryStyle.value.second,
@@ -822,6 +844,7 @@ fun HomeRoot(
         }
     }
     }
+}
 }
 
 /** The middle of the focused tile (design px): what a launch zooms in on. */

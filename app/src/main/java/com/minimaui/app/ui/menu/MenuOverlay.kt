@@ -65,7 +65,6 @@ import com.minimaui.app.ui.theme.MenuPillIdle
 import com.minimaui.app.ui.theme.GlowColor
 import com.minimaui.app.ui.theme.IndicatorOn
 import com.minimaui.app.ui.theme.MenuPanelFill
-import com.minimaui.app.ui.theme.MenuScrim
 import com.minimaui.app.ui.theme.TextPrimary
 
 enum class MenuFocus { Categories, Actions }
@@ -350,7 +349,6 @@ fun MenuOverlay(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MenuScrim)
             // Touch: tap a category, an entry or a page dot, or outside the panel to close the menu.
             .pointerInput(category, page, entries.size, folderScroll) {
                 detectTapGestures { offset ->

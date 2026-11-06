@@ -226,6 +226,8 @@ fun AllGamesScreen(
     platformTitle: (Platform) -> String? = { null },
     wave: Int = WaveOriginal,
     ribbon: Boolean = false,
+    /** The Minima wave fills the screen behind the page: the fades then take the content away instead of painting black. */
+    coloredBackground: Boolean = false,
     pressTick: Int = 0,
     editMode: Boolean = false,
     held: Boolean = false,
@@ -339,7 +341,7 @@ fun AllGamesScreen(
 
         // One game list per platform, sliding along with its tile. Only the selected platform and its
         // neighbours exist at a time: a column fades out as it slides away from the selected position.
-        if (platforms.isNotEmpty()) {
+        if (platforms.isNotEmpty()) Box(Modifier.fillMaxSize().fadeContent(coloredBackground) { listFadeBrush() }) {
             for (i in maxOf(platformIndex - 1, 0)..minOf(platformIndex + 1, platforms.lastIndex)) {
                 val platform = platforms[i]
                 key(platform.id) {
@@ -375,14 +377,14 @@ fun AllGamesScreen(
         SelectionGlow(target = glowRect, adaptiveBlur = true)
 
         // The platform tiles are solid black and drawn over the covers, so covers sliding up never show through them.
-        if (platforms.isNotEmpty()) {
+        if (platforms.isNotEmpty()) Box(Modifier.fillMaxSize().fadeContent(coloredBackground) { rowDimBrush() }) {
             for (i in maxOf(platformIndex - 4, 0)..minOf(platformIndex + 5, platforms.lastIndex)) {
                 key(platforms[i].id) { PlatformTile(platform = platforms[i], logo = logos[i], index = i, widths = widths, position = platformPosition, heldAmount = heldAmount, editAmount = editAmount) }
             }
         }
 
         // The list fades to black at the bottom of the screen, where the third cover runs off it.
-        Box(
+        if (!coloredBackground) Box(
             modifier = Modifier
                 .offset(0.dp, ListFadeTop.dp)
                 .size(Dimens.DesignWidth.dp, (Dimens.DesignHeight - ListFadeTop).dp)
@@ -406,20 +408,11 @@ fun AllGamesScreen(
 
         // Dims the platform icons toward the screen edges; on the right it starts just past the selected
         // tile, so every icon after it is slightly dimmer than the one before.
-        Box(
+        if (!coloredBackground) Box(
             modifier = Modifier
                 .offset(0.dp, (RowCenterY - RowDimHalfHeight).dp)
                 .size(Dimens.DesignWidth.dp, (2 * RowDimHalfHeight).dp)
-                .background(
-                    Brush.horizontalGradient(
-                        0f to Color(0xE6000000),
-                        0.085f to Color.Transparent,
-                        0.46f to Color.Transparent,
-                        0.62f to Color(0x40000000),
-                        0.82f to Color(0x99000000),
-                        1f to Color(0xF2000000)
-                    )
-                )
+                .background(RowDimStops.let { Brush.horizontalGradient(*it) })
         )
     }
 }
@@ -609,6 +602,43 @@ internal const val FocusCenterY = 548f
 private const val CoverWidth = 500f
 private const val CoverAspect = 9f / 17f
 private const val CoverGap = 40f
+/** How the platform row dims toward the screen edges (black at these strengths across the screen's width). */
+private val RowDimStops = arrayOf(
+    0f to Color(0xE6000000),
+    0.085f to Color.Transparent,
+    0.46f to Color.Transparent,
+    0.62f to Color(0x40000000),
+    0.82f to Color(0x99000000),
+    1f to Color(0xF2000000)
+)
+
+/** The row dim as an alpha mask, in px, for [fadeContent]: the band around the row, dimming toward the edges as [RowDimStops] say. */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.rowDimBrush(): Pair<Brush, androidx.compose.ui.geometry.Rect> {
+    val top = (RowCenterY - RowDimHalfHeight).dp.toPx()
+    return Brush.horizontalGradient(*RowDimStops, startX = 0f, endX = size.width) to
+        androidx.compose.ui.geometry.Rect(0f, top, size.width, top + (2 * RowDimHalfHeight).dp.toPx())
+}
+
+/** The list's fade at the bottom of the screen as an alpha mask, in px, for [fadeContent]. */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.listFadeBrush(): Pair<Brush, androidx.compose.ui.geometry.Rect> {
+    val top = ListFadeTop.dp.toPx()
+    return Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black, startY = top, endY = size.height) to
+        androidx.compose.ui.geometry.Rect(0f, top, size.width, size.height)
+}
+
+/**
+ * With [on], takes the content away where [mask] (a brush and the rect it covers) is opaque, instead of painting black over it:
+ * the same look over a black background, but the Minima wave shows through rather than a black band.
+ */
+private fun Modifier.fadeContent(on: Boolean, mask: androidx.compose.ui.graphics.drawscope.DrawScope.() -> Pair<Brush, androidx.compose.ui.geometry.Rect>): Modifier =
+    if (!on) this else this
+        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+        .drawWithContent {
+            drawContent()
+            val (brush, rect) = mask()
+            drawRect(brush, topLeft = rect.topLeft, size = rect.size, blendMode = BlendMode.DstOut)
+        }
+
 private const val ListFadeTop = 930f // the fade to black under the list starts here and is solid at the screen's bottom
 private const val CoverDecodePx = 340
 
