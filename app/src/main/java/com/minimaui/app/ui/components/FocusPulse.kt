@@ -12,7 +12,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 
 /** Brightness factor of the focus highlight, fading between [PulseMin] and 1 like the PSP's XMB. Read it at draw time. */
@@ -27,8 +26,7 @@ val LocalDimmed = staticCompositionLocalOf { false }
 private const val PulseMin = 0.4f
 private const val PulseHalfPeriodMillis = 900
 
-/** The pulse is slow, so it is redrawn 30 times a second however fast the display runs. */
-private const val PulseFps = 30
+// The pulse is slow, so it steps on the shared beat (30 a second, see Beat.kt) however fast the display runs.
 
 /**
  * Runs one shared pulse for the whole UI, so every focused element breathes in step. It sleeps between steps (instead of
@@ -41,12 +39,13 @@ fun ProvideFocusPulse(dimmed: Boolean = false, idle: Boolean = false, content: @
     val pulse = remember { mutableFloatStateOf(PulseMin) }
     val resting by rememberUpdatedState(idle || dimmed)
     LaunchedEffect(Unit) {
-        val sleep = 1000L / PulseFps - 4L
         var origin = 0L
         var resume = false
         while (true) {
             var atPeak = false
+            var frame = 0L
             withFrameNanos { now ->
+                frame = now
                 val millis = now / 1_000_000L
                 // Starting again after a rest: begin at the peak.
                 if (resume) {
@@ -63,7 +62,7 @@ fun ProvideFocusPulse(dimmed: Boolean = false, idle: Boolean = false, content: @
                 snapshotFlow { resting }.first { !it }
                 resume = true
             } else {
-                delay(sleep)
+                awaitNextBeat(frame)
             }
         }
     }

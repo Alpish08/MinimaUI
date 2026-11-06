@@ -353,10 +353,15 @@ fun MenuOverlay(
     // fade in once the box is there. One clock runs it all; each part takes its own stretch of it (see EditPhases).
     val edit = remember { Animatable(if (customizing) 1f else 0f) }
     androidx.compose.runtime.LaunchedEffect(customizing) {
+        // Turned around halfway: carry on from where the box is now in the other direction's timing, so it doesn't jump.
+        val t = edit.value
+        if (t > 0f && t < 1f) edit.snapTo(editTimeFor(editPhase(t, EditSlide, !customizing), EditSlide, customizing, t))
         edit.animateTo(if (customizing) 1f else 0f, tween(EditMillis, easing = androidx.compose.animation.core.LinearEasing))
     }
     val editShown by remember { androidx.compose.runtime.derivedStateOf { edit.value > 0f } }
-    val subBoxX = { SubBox.x + (EditBoxX - SubBox.x) * EaseInOut.transform(editPhase(edit.value, EditSlide)) }
+    // Each part at the current moment (0 = the menu, 1 = Customize); on the way back the parts run in their own, mirrored order.
+    val part = { span: EditPart -> editPhase(edit.value, span, customizing) }
+    val subBoxX = { SubBox.x + (EditBoxX - SubBox.x) * EaseInOut.transform(part(EditSlide)) }
 
     Box(
         modifier = modifier
@@ -449,7 +454,7 @@ fun MenuOverlay(
                 .backgroundOutline(depth = 24.dp, corner = Dimens.PanelCorner)
         ) {
             // The categories (they fade out while Customize is open).
-            Box(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - editPhase(edit.value, EditCategoriesOut) }) {
+            Box(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - part(EditCategoriesOut) }) {
             // Only the part of the menu being navigated glows; the category left behind keeps just its white border.
             SelectionGlow(if (focus == MenuFocus.Categories) categoryRect(category.ordinal).grown(CategoryGrow).toGlow() else null)
 
@@ -487,7 +492,7 @@ fun MenuOverlay(
             )
 
             // The pages, side by side in the sub-box; each has its own glow, pills and focus ring, and slides with the others.
-            Box(Modifier.fillMaxSize().graphicsLayer { alpha = entriesFade.value * (1f - editPhase(edit.value, EditEntriesOut)) }) {
+            Box(Modifier.fillMaxSize().graphicsLayer { alpha = entriesFade.value * (1f - part(EditEntriesOut)) }) {
             val shownPages = lastShown.pages.size
             val shownPage = if (settled) page else lastShown.page
             for (p in 0 until shownPages) {
@@ -531,7 +536,7 @@ fun MenuOverlay(
                     contentAlignment = Alignment.Center
                 ) {
                     PageDots(
-                        modifier = Modifier.graphicsLayer { alpha = entriesFade.value * (1f - editPhase(edit.value, EditEntriesOut)) },
+                        modifier = Modifier.graphicsLayer { alpha = entriesFade.value * (1f - part(EditEntriesOut)) },
                         count = pages,
                         current = page,
                         vertical = false,
@@ -542,7 +547,7 @@ fun MenuOverlay(
                 }
             }
 
-            if (customizing || editShown) CustomizeContent(customize, progress = { edit.value })
+            if (customizing || editShown) CustomizeContent(customize, listIn = { part(EditListIn) }, previewIn = { part(EditPreviewIn) })
         }
 
         // On the screen's bottom right, where the page hints normally are, not inside the panel.
@@ -823,15 +828,33 @@ class WaveCustomize(
     val onClose: () -> Unit = {},
 )
 
-/** How long going into Customize takes, and the stretch of it (start, end; 0..1) each part moves in. */
+/**
+ * How long going into (or out of) Customize takes, and the stretch of it (start, end; 0..1 of the way) each part moves in, going
+ * in and coming back. Coming back mirrors going in: the sliders and the preview go first and the box starts sliding at once, so
+ * it feels as quick as going in (simply running the way in backwards would leave the box waiting for the sliders).
+ */
 private const val EditMillis = 640
-private val EditEntriesOut = 0f to 0.15f
-private val EditCategoriesOut = 0f to 0.45f
-private val EditSlide = 0.05f to 0.72f
-private val EditPreviewIn = 0.42f to 1f
-private val EditListIn = 0.72f to 0.95f
+
+private class EditPart(val enter: Pair<Float, Float>, val exit: Pair<Float, Float>)
+
+private val EditEntriesOut = EditPart(0f to 0.15f, 0.8f to 1f)
+private val EditCategoriesOut = EditPart(0f to 0.45f, 0.5f to 1f)
+private val EditSlide = EditPart(0.05f to 0.72f, 0.08f to 0.75f)
+private val EditPreviewIn = EditPart(0.42f to 1f, 0f to 0.45f)
+private val EditListIn = EditPart(0.72f to 0.95f, 0f to 0.15f)
 
 private fun editPhase(t: Float, span: Pair<Float, Float>): Float = ((t - span.first) / (span.second - span.first)).coerceIn(0f, 1f)
+
+/** How far [part] is toward Customize (0..1) when the transition clock is at [t] (0 = the menu, 1 = Customize), going in or out. */
+private fun editPhase(t: Float, part: EditPart, entering: Boolean): Float =
+    if (entering) editPhase(t, part.enter) else 1f - editPhase(1f - t, part.exit)
+
+/** The clock time at which [part] is at [value] going in ([entering]) or out; [fallback] if it is at either end. */
+private fun editTimeFor(value: Float, part: EditPart, entering: Boolean, fallback: Float): Float {
+    if (value <= 0f || value >= 1f) return fallback
+    val (start, end) = if (entering) part.enter else part.exit
+    return if (entering) start + value * (end - start) else 1f - (start + (1f - value) * (end - start))
+}
 
 // The sub-box mirrored to the panel's left side (the same margin as on the right), its two slider cards, and the preview in the right half.
 private const val EditBoxX = 50f
@@ -849,14 +872,14 @@ private const val EditPreviewY = 259f
 private fun editCardRect(index: Int) = UiRect(EditBoxX + SubBox.width / 2f - EditCardW / 2f, EditCardTop + index * EditCardPitch, EditCardW, EditCardH)
 
 @Composable
-private fun CustomizeContent(customize: WaveCustomize, progress: () -> Float) {
+private fun CustomizeContent(customize: WaveCustomize, listIn: () -> Float, previewIn: () -> Float) {
     val density = androidx.compose.ui.platform.LocalDensity.current.density
     val shape = RoundedCornerShape(SubBoxCorner.dp)
     // Where the pages are, in page units: it eases to the current one, so they slide inside the box as the menu's do.
     val position = remember { Animatable(customize.page.toFloat()) }
     androidx.compose.runtime.LaunchedEffect(customize.page) { position.animateTo(customize.page.toFloat(), tween(360, easing = EaseInOut)) }
     // The pages: in once the box has arrived, out first on the way back.
-    Box(Modifier.fillMaxSize().graphicsLayer { alpha = editPhase(progress(), EditListIn) }) {
+    Box(Modifier.fillMaxSize().graphicsLayer { alpha = listIn() }) {
         for (p in customize.titles.indices) {
             val distance = p - position.value
             if (kotlin.math.abs(distance) >= 1f) continue
@@ -898,7 +921,7 @@ private fun CustomizeContent(customize: WaveCustomize, progress: () -> Float) {
         Modifier
             .fillMaxSize()
             .graphicsLayer {
-                val p = EaseInOut.transform(editPhase(progress(), EditPreviewIn))
+                val p = EaseInOut.transform(previewIn())
                 alpha = p
                 translationX = (1f - p) * 60f * density
                 val s = 0.94f + 0.06f * p

@@ -12,6 +12,8 @@ import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.first
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import kotlin.math.roundToInt
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.layout.layout
@@ -20,7 +22,6 @@ import androidx.compose.ui.graphics.ShaderBrush
 import com.minimaui.app.model.WaveConfig
 import com.minimaui.app.model.WaveFadeTarget
 import com.minimaui.app.model.WaveKey
-import kotlinx.coroutines.delay
 
 /** Draws the XMB wave behind the All Games page (and, blurred and dimmer, the Apps page). This is the master switch; Customize has the one the user flips. */
 const val XmbWaveEnabled = true
@@ -36,8 +37,7 @@ const val WaveRibbon = 2
 /** How bright the original wave is behind the Apps page (the icons stay in front); the ribbon isn't dimmed. */
 const val AppsWaveBrightness = 0.66f
 
-/** The wave is redrawn this many times a second (it moves slowly, so 30 is smooth and a quarter of the cost of 120). */
-private const val WaveFps = 30
+// The wave is redrawn on the shared beat (see Beat.kt): it moves slowly, so 30 a second is smooth and a quarter of the cost of 120.
 
 /** Wave time runs this fast at Speed 100%; it is added up per frame from the real time, so the pace doesn't depend on the frame rate. */
 private const val TimePerSecond = 0.36f
@@ -50,18 +50,23 @@ private const val MaxPulses = 4
 
 /**
  * The ripples reach the shader as a small table (a bitmap, [RippleCols] columns across the screen and one row per line, plus a last row
- * for the brightness lift): the work of the ripples is done here, once per column, not once per pixel. A displacement is stored as a
- * byte, 127 meaning none, [RippleRange] design px at either end.
+ * for the brightness lift): the work of the ripples is done here, once per column, not once per pixel. Each value is 16 bits, in the
+ * red (high byte) and green (low byte) channels, so the lines move smoothly rather than in whole-pixel steps; a displacement is
+ * 32768 for none and [RippleRange] design px at either end, the lift 0..1.
  */
-private const val RippleCols = 96
+private const val RippleCols = 160
 private const val RippleRange = 64f
 
-/** A ripple lives this long, in seconds; it enters just outside one side, travels across the 960 x 540 design space and dies away. */
+/** A ripple lives this long, in seconds; it enters just outside one side and travels [PulseReach] of the way across, dying away as it goes. */
 private const val PulseSeconds = 2.4f
+
+/** How far across the screen (from the side it enters) a ripple gets before it has levelled out completely. */
+private const val PulseReach = 0.8f
 
 /**
  * Ripples the shoulder buttons send across the ribbon: each enters from one side as a swell the lines rise in together, with a
- * small ripple riding on it, travels across (slowing as it goes) and brightens the lines a little, then fades. Each lines follows
+ * small ripple riding on it, travels in (slowing as it goes) and brightens the lines a little, dying away gradually until it has levelled out
+ * [PulseReach] of the way across. Each lines follows
  * it a little differently, differently for every ripple. Only used on the main thread.
  */
 class WavePulses {
@@ -77,47 +82,68 @@ class WavePulses {
         live.add(Ripple(fromRight, strength, now, kotlin.random.Random.nextFloat()))
     }
 
-    /** Writes the live ripples into [pixels] ([RippleCols] x (lines + 1), see above) and returns how many there are (0: the table is untouched). */
-    fun fillTable(pixels: IntArray, heights: FloatArray): Int {
+    /** True while a ripple is crossing (the wave then steps at twice its usual rate, as the ripple moves much faster than the lines). */
+    fun active(): Boolean {
+        val now = System.nanoTime()
+        return live.any { age(it, now) < PulseSeconds }
+    }
+
+    // Per line, what it does differently in a ripple (its lag, ripple height, phase and swell height): four hashes, worked out
+    // once a line per ripple rather than once a column.
+    private val lineHash = FloatArray(MaxLines * 4)
+
+    /**
+     * Writes the live ripples into [pixels] ([RippleCols] x (lines + 1), see above) for the first [lines] lines and returns how
+     * many ripples there are (0: the table is untouched).
+     */
+    fun fillTable(pixels: IntArray, heights: FloatArray, lines: Int = MaxLines): Int {
         val now = System.nanoTime()
         var count = 0
         java.util.Arrays.fill(heights, 0f)
         val rows = MaxLines + 1
+        val n = lines.coerceIn(0, MaxLines)
         for (r in live) {
             val s = age(r, now) / PulseSeconds
             if (s >= 1f) continue
             val travel = 1f - Math.pow((1f - s).toDouble(), 1.6).toFloat()    // fast out of the side, slower as it spreads
-            val front = if (r.fromRight) 1060f - 1150f * travel else -100f + 1150f * travel
-            val strength = Math.pow((1f - s).toDouble(), 0.9).toFloat() * smooth(s / 0.12f)
+            // From just outside the side to PulseReach of the way across; it weakens with the distance it has come, to nothing there.
+            val gone = -100f + (960f * PulseReach + 100f) * travel
+            val front = if (r.fromRight) 960f - gone else gone
+            val strength = Math.pow((1f - (gone / (960f * PulseReach)).coerceIn(0f, 1f)).toDouble(), 1.3).toFloat() * smooth(s / 0.12f)
             val ripple = 4f * r.strength * strength
             val swell = 15f * r.strength * strength
             val width = 130f + 80f * s
             val lift = 0.22f * r.strength.coerceAtMost(1.5f) * strength
+            for (i in 0 until n) {
+                val k = i * 4f + r.seed * 101f
+                for (j in 0 until 4) lineHash[i * 4 + j] = hash(k + j)
+            }
             for (c in 0 until RippleCols) {
                 val x = (c + 0.5f) / RippleCols * 960f
                 val wide = (x - front) / (width * 2.2f)
                 heights[MaxLines * RippleCols + c] += lift / (1f + 0.5f * wide * wide).let { it * it }
-                for (i in 0 until MaxLines) {
-                    // What each line does differently: its lag, ripple height, phase and swell height.
-                    val k = i * 4f + r.seed * 101f
-                    val u = x - front - (hash(k) - 0.5f) * 140f
+                for (i in 0 until n) {
+                    val h = i * 4
+                    val u = x - front - (lineHash[h] - 0.5f) * 140f
                     val t = u / width
                     val e = 1f / (1f + 0.5f * t * t)
                     val w = t / 2.2f
                     val es = 1f / (1f + 0.5f * w * w)
-                    heights[i * RippleCols + c] += ripple * (0.6f + 0.8f * hash(k + 1f)) * e * e *
-                        Math.sin((u * 0.021f + (hash(k + 2f) - 0.5f) * 1.2f).toDouble()).toFloat() -
-                        swell * (0.75f + 0.5f * hash(k + 3f)) * es * es
+                    heights[i * RippleCols + c] += ripple * (0.6f + 0.8f * lineHash[h + 1]) * e * e *
+                        kotlin.math.sin(u * 0.021f + (lineHash[h + 2] - 0.5f) * 1.2f) -
+                        swell * (0.75f + 0.5f * lineHash[h + 3]) * es * es
                 }
             }
             count++
         }
         if (count == 0) return 0
-        for (row in 0 until rows) for (c in 0 until RippleCols) {
-            val v = heights[row * RippleCols + c]
-            val byte = if (row == MaxLines) (v * 255f).toInt() else (v / RippleRange * 127f).toInt() + 127
-            val b = byte.coerceIn(0, 255)
-            pixels[row * RippleCols + c] = (0xFF shl 24) or (b shl 16) or (b shl 8) or b
+        for (row in 0 until rows) {
+            if (row >= n && row != MaxLines) continue
+            for (c in 0 until RippleCols) {
+                val v = heights[row * RippleCols + c]
+                val word = (if (row == MaxLines) v * 65535f else v / RippleRange * 32767f + 32768f).roundToInt().coerceIn(0, 65535)
+                pixels[row * RippleCols + c] = (0xFF shl 24) or ((word shr 8) shl 16) or ((word and 0xFF) shl 8)
+            }
         }
         return count
     }
@@ -198,7 +224,6 @@ uniform float4 wht;            // the same for the white lines
 uniform float4 misc;           // red width, white width, dither, brightness
 uniform float2 fadeWho;        // which white lines fade (0 all, 1 top, 2 bottom, 3 near), and a factor for how many
 uniform float blur;            // blur of the whole wave (a page's blur)
-uniform float lineBlur;        // extra blur of every line, screen px
 uniform float4 rib;            // ribbon width (design px), twist 0..1, fill 0..1, threads 0..3
 uniform float4 lite;           // glow, band, sheen, depth of field (0..1 each)
 uniform float4 more;           // particles 0..1, edge fade (share of the width, 0 = none), tilt -1..1, background 0..1
@@ -206,11 +231,20 @@ uniform float2 tone;           // red line 1 / white 0, clock (wave time)
 uniform float np;              // ripples alive (0: none, the table is not used)
 uniform shader rip;            // the ripples' table: one row per line, the brightness lift in the last (see RippleCols)
 
-// The ripples' table at [x] (design px) in [row], 0..1, blended between its two nearest columns.
-float rippleAt(float row, float x, float w) {
+// One 16-bit value of the ripples' table (high byte in red, low in green), 0..1.
+float rippleWord(float c, float row) {
+    half4 t = rip.eval(float2(c + 0.5, row + 0.5));
+    return (floor(float(t.r) * 255.0 + 0.5) * 256.0 + floor(float(t.g) * 255.0 + 0.5)) / 65535.0;
+}
+
+// The ripples' table at [x] (design px) in [row], blended between its two nearest columns: the value (0..1) and how fast it
+// changes across, per design px.
+float2 rippleAt(float row, float x, float w) {
     float fx = clamp(x / w * $RippleCols.0 - 0.5, 0.0, $RippleCols.0 - 1.001);
     float c = floor(fx);
-    return mix(rip.eval(float2(c + 0.5, row + 0.5)).r, rip.eval(float2(c + 1.5, row + 0.5)).r, fx - c);
+    float a = rippleWord(c, row);
+    float b = rippleWord(c + 1.0, row);
+    return float2(mix(a, b, fx - c), (b - a) * $RippleCols.0 / w);
 }
 
 float lineY(float4 l, float x, float w) {
@@ -279,20 +313,26 @@ half4 main(float2 p) {
     float clock = tone.y;
     float noise = (fract(52.9829189 * fract(dot(p, float2(0.06711056, 0.00583715)))) - 0.5) * misc.z / 255.0;
     float ys[$MaxLines];
-    float lift = np > 0.5 ? rippleAt($MaxLines.0, d.x, w) : 0.0;
+    float rs[$MaxLines];   // each line's slope from the ripples (so the lines keep their width on a ripple's steep parts)
+    float lift = np > 0.5 ? rippleAt($MaxLines.0, d.x, w).x : 0.0;
     float top = 1.0e5;
     float bottom = -1.0e5;
     float yb = base;   // the red line's height (arrays can only be indexed by the loop)
     for (int i = 0; i < $MaxLines; i++) {
         if (float(i) >= n) break;
         ys[i] = lineY(L[i], d.x, w);
-        if (np > 0.5) ys[i] += (rippleAt(float(i), d.x, w) * 255.0 - 127.0) / 127.0 * $RippleRange;
+        rs[i] = 0.0;
+        if (np > 0.5) {
+            float2 r = rippleAt(float(i), d.x, w) * (65535.0 / 32767.0 * $RippleRange);
+            ys[i] += r.x - 32768.0 / 32767.0 * $RippleRange;
+            rs[i] = r.y;
+        }
         top = min(top, ys[i] - max(rib.x, 0.0));
         bottom = max(bottom, ys[i]);
         if (abs(float(i) - mid) < 0.5) yb = ys[i];
     }
     // Well above every line, and well below them and their fades, there is nothing to draw, unless the background is lit.
-    float reach = 40.0 + lineBlur / scale * 3.0 + lite.x * 50.0 + lite.y * 110.0 + more.x * 110.0 + lite.w * 24.0 + (blur - 1.0) * 30.0;
+    float reach = 40.0 + lite.x * 50.0 + lite.y * 110.0 + more.x * 110.0 + lite.w * 24.0 + (blur - 1.0) * 30.0;
     if (more.w <= 0.0) {
         if (d.y < top - reach) return half4(0.0);
         float deep = max(red.x > 0.0 ? red.y : 0.0, wht.x > 0.0 ? wht.y : 0.0);
@@ -339,7 +379,7 @@ half4 main(float2 p) {
             acc = float4(redC * a, a) + acc * (1.0 - a);
         }
     }
-    float soft0 = lineBlur + (blur - 1.0) * 1.65 * scale;
+    float soft0 = (blur - 1.0) * 1.65 * scale;
     float boost = (1.0 + lift) * (1.0 + 1.2 * sh) / pow(blur, 0.7);
     // The white lines, a little fainter the further they are from the red one; then the red line over them.
     for (int pass = 0; pass < 2; pass++) {
@@ -358,10 +398,10 @@ half4 main(float2 p) {
             float steep = (1.41 * L[i].y * 6.2831853 * L[i].z + abs(more.z) * 120.0) / w;
             float span = (widthPx * 0.5 + 4.0 * softPx + 1.0 + (lite.x > 0.0 ? 3.5 * (16.0 * scale + softPx) : 0.0)) / scale * sqrt(1.0 + steep * steep);
             if (dy < min(0.0, wi) - span || dy > max(0.0, wi) + span) continue;
-            float sl = lineSlope(L[i], d.x, w);
+            float sl = lineSlope(L[i], d.x, w) + rs[i];
             float k = 1.0 / sqrt(1.0 + sl * sl);
             float c = sheet(dy, k, wi, widthPx, softPx);
-            float dim = 1.0 / (1.0 + (lineBlur + dof) / scale * 0.12);
+            float dim = 1.0 / (1.0 + dof / scale * 0.12);
             float opacity = isRed ? red.w : wht.w * (0.5 + 0.5 * (1.0 - abs(fi - mid) / n));
             float a = min(c * opacity * misc.w * dim * boost, 1.0);
             float3 col = isRed ? redC : float3(1.0);
@@ -441,15 +481,16 @@ fun XmbWave(
         var last = 0L
         while (true) {
             withFrameNanos { now ->
-                waveClock.clock = now / 1e9f
                 if (last != 0L) {
                     val seconds = ((now - last) / 1e9f).coerceAtMost(0.25f)
                     waveClock.time += seconds * TimePerSecond * current[WaveKey.Speed] / 100f * (if (current[WaveKey.Reverse] > 0.5f) -1f else 1f)
                 }
                 last = now
+                waveClock.clock = now / 1e9f // last: this is the write that redraws the wave
             }
-            // Sleeping between frames (rather than skipping them) lets the app idle: it wakes WaveFps times a second, not on every vsync.
-            delay(1000L / WaveFps - 4L)
+            // Sleeping between frames (rather than skipping them) lets the app idle: it wakes on the shared beat, not on every vsync.
+            // While a ripple crosses, at twice the beat (still on its frames): the ripple moves far faster than the lines.
+            awaitNextBeat(last, if (livePulses?.active() == true) 2 else 1)
             // With nothing touched for a while the wave stops where it is (nothing is drawn), until the first input.
             if (resting) {
                 snapshotFlow { resting }.first { !it }
@@ -459,7 +500,9 @@ fun XmbWave(
     }
     Box(modifier) {
     Box(
-        (if (lowRes) Modifier.halfResolution() else Modifier.fillMaxSize()).drawBehind {
+        // In a layer of its own (as the half-resolution one already is): a new frame of the wave then re-records only the wave,
+        // not everything else drawn in the same layer as it.
+        (if (lowRes) Modifier.halfResolution() else Modifier.fillMaxSize().graphicsLayer()).drawBehind {
             if (!ribbon) {
                 shader.setFloatUniform("size", size.width, size.height)
                 shader.setFloatUniform("time", waveClock.clock % 6283f)
@@ -469,6 +512,7 @@ fun XmbWave(
                 return@drawBehind
             }
             val c = current
+            waveClock.clock // read so that each new frame of the clock redraws the wave (the time itself isn't observed)
             val scale = size.height / 540f
             val count = c.lineCount
             c.fillLines(waveClock.time, lines)
@@ -485,8 +529,7 @@ fun XmbWave(
             val whiteCount = (count - 1).coerceAtLeast(1)
             shader.setFloatUniform("fadeWho", c.target.ordinal.toFloat(), if (c.target == WaveFadeTarget.All) 1f / kotlin.math.sqrt(whiteCount.toFloat()) else 1f)
             shader.setFloatUniform("blur", soft.coerceAtLeast(1f))
-            shader.setFloatUniform("lineBlur", c[WaveKey.Blur] * scale)
-            val alive = livePulses?.fillTable(ripplePixels, rippleHeights) ?: 0
+            val alive = livePulses?.fillTable(ripplePixels, rippleHeights, count) ?: 0
             if (alive > 0) {
                 rippleTurn[0] = 1 - rippleTurn[0]
                 rippleBitmaps[rippleTurn[0]].setPixels(ripplePixels, 0, RippleCols, 0, 0, RippleCols, MaxLines + 1)
@@ -508,8 +551,10 @@ fun XmbWave(
  * wave (the frosted copy behind the Favorites dock) can follow it exactly.
  */
 class WaveTimeline {
-    var time by mutableFloatStateOf(0f)
+    /** Wave time; a plain field, since it always changes together with [clock] (one state write a frame instead of two). */
+    var time = 0f
         internal set
+    /** Real time in seconds; the state the waves' draws observe. */
     var clock by mutableFloatStateOf(0f)
         internal set
 }

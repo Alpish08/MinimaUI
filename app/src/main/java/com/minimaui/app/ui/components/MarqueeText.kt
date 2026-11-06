@@ -2,7 +2,6 @@ package com.minimaui.app.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Alignment
@@ -12,7 +11,14 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -38,6 +44,10 @@ private const val ScrollSeconds = 30
 private val ScrollVelocity = 30.dp
 private const val ScrollRepeatDelayMillis = 1200
 private const val ScrollInitialDelayMillis = 700
+
+// A scrolling title moves on the shared beat (30 steps a second, see Beat.kt): at its slow pace the steps don't show, and it
+// lands on the same frames as the wave and the focus pulse, so it costs no extra frames. (Compose's own marquee would redraw
+// on every frame of the 120 Hz display.)
 
 /**
  * One-line bold text that ends in "…" when too long, and scrolls sideways instead while [scrolling] is on (for about [ScrollSeconds] seconds, then it holds still).
@@ -68,6 +78,31 @@ fun MarqueeText(
         val roundMillis = (naturalWidth + constraints.maxWidth / 3f) / with(density) { ScrollVelocity.toPx() } * 1000f + ScrollRepeatDelayMillis
         val rounds = (ScrollSeconds * 1000f / roundMillis).toInt().coerceIn(1, ScrollLoops)
         val fade by animateFloatAsState(if (scroll) 1f else 0f, tween(250), label = "marqueeFade")
+        // One round is the text (with its indents) and a gap of a third of the width; the offset is read only in the draw.
+        val loopPx = naturalWidth + with(density) { (startIndent + endIndent).toPx() } + constraints.maxWidth / 3f
+        val offset = remember { mutableFloatStateOf(0f) }
+        LaunchedEffect(scroll, text, loopPx, rounds) {
+            offset.floatValue = 0f
+            if (!scroll) return@LaunchedEffect
+            val pxPerSecond = with(density) { ScrollVelocity.toPx() }
+            delay(ScrollInitialDelayMillis.toLong())
+            repeat(rounds) { round ->
+                var start = -1L
+                var done = false
+                var frame = 0L
+                while (!done) {
+                    withFrameNanos { now ->
+                        frame = now
+                        if (start < 0L) start = now
+                        val moved = (now - start) / 1e9f * pxPerSecond
+                        done = moved >= loopPx
+                        offset.floatValue = if (done) 0f else moved
+                    }
+                    if (!done) awaitNextBeat(frame)
+                }
+                if (round < rounds - 1) delay(ScrollRepeatDelayMillis.toLong())
+            }
+        }
         val indent = if (centerWhenFits && !overflows) Modifier else Modifier.padding(start = startIndent, end = endIndent)
         Text(
             text = text,
@@ -80,7 +115,7 @@ fun MarqueeText(
             overflow = if (scrolling) TextOverflow.Clip else TextOverflow.Ellipsis,
             modifier = Modifier
                 .then(if (fade > 0f) Modifier.fadingEdges(EdgeFade * fade) else Modifier)
-                .then(if (scroll) Modifier.basicMarquee(iterations = rounds, repeatDelayMillis = ScrollRepeatDelayMillis, initialDelayMillis = ScrollInitialDelayMillis, velocity = ScrollVelocity) else Modifier)
+                .then(if (scroll) Modifier.slowMarquee({ offset.floatValue }, loopPx) else Modifier)
                 .then(indent)
         )
     }
@@ -94,6 +129,28 @@ fun rememberTextWidth(text: String, fontSize: TextUnit): Int {
     val style = LocalTextStyle.current.merge(TextStyle(fontSize = fontSize, fontWeight = FontWeight.Bold))
     return remember(text, style, density) { measurer.measure(text, style, softWrap = false, maxLines = 1).size.width }
 }
+
+/**
+ * Shows the content (measured as wide as it likes) moved [offset] px to the left, clipped to the space it has, with a second
+ * copy [loopPx] further right so the text comes round again. The offset is read in the draw, so scrolling never recomposes.
+ */
+private fun Modifier.slowMarquee(offset: () -> Float, loopPx: Float): Modifier = this
+    .clipToBounds()
+    .layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity))
+        layout(placeable.width.coerceAtMost(constraints.maxWidth), placeable.height) { placeable.place(0, 0) }
+    }
+    .drawWithContent {
+        val x = offset()
+        drawContext.transform.translate(-x, 0f)
+        drawContent()
+        if (x > 0f) {
+            drawContext.transform.translate(loopPx, 0f)
+            drawContent()
+            drawContext.transform.translate(-loopPx, 0f)
+        }
+        drawContext.transform.translate(x, 0f)
+    }
 
 /** Fades the content out toward its left and right edges over [width]. */
 private fun Modifier.fadingEdges(width: Dp): Modifier = this

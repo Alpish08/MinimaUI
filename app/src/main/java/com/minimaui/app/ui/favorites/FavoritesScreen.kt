@@ -440,7 +440,8 @@ private fun FocusBrackets(slot: BentoSlot, held: Boolean, originX: Float, origin
     val height by animateFloatAsState(slot.height.value, spec, label = "bracketH")
     val pulse = LocalFocusPulse.current
     val scale by animateFloatAsState((if (held) HeldScale else 1f) * focusScaleFor(slot.size), tween(160), label = "bracketScale")
-    Canvas(modifier = Modifier.fillMaxSize()) {
+    // In a layer of its own, so the pulse redraws only the marks.
+    Canvas(modifier = Modifier.fillMaxSize().graphicsLayer()) {
         // The marks are as thick as the focus outline and curve concentrically with the tile's own corners.
         val strokeWidth = Dimens.FocusedBorderWidth.toPx()
         val gap = 14.dp.toPx() + strokeWidth / 2f

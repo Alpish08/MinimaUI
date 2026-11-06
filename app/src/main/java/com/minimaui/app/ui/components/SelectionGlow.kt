@@ -124,6 +124,8 @@ fun SelectionGlow(
     Box(
         modifier = Modifier
             .placeHighlight(h, inflate)
+            // In a layer of its own (it isn't clipped to it), so the pulse redraws only the glow.
+            .graphicsLayer()
             .drawBehind {
                 val sigma = blurRadius.toPx()
                 if (dithered) {

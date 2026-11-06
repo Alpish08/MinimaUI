@@ -433,7 +433,8 @@ private val BracketIdle = Color(0xFFB4B4B4)
 private fun PlatformBrackets(widths: FloatArray, heights: FloatArray, position: State<Float>, held: Boolean) {
     val pulse = LocalFocusPulse.current
     val scale by animateFloatAsState(if (held) BracketHeldScale else 1f, tween(160), label = "platformBracketScale")
-    Canvas(modifier = Modifier.fillMaxSize()) {
+    // In a layer of its own, so the pulse redraws only the marks.
+    Canvas(modifier = Modifier.fillMaxSize().graphicsLayer()) {
         val p = position.value.coerceIn(0f, widths.lastIndex.toFloat())
         val k = p.toInt().coerceAtMost(widths.lastIndex)
         val next = minOf(k + 1, widths.lastIndex)
@@ -661,6 +662,14 @@ private val SlotCenterY: FloatArray = run {
     centers
 }
 
+/**
+ * How opaque a cover is whose brightness (its [SlotAlpha]) is [brightness]: fully, on every slot that shows (they are darkened
+ * instead, see CoverSlot); only between the last shown slot and the invisible one past it does it fade out.
+ */
+private fun slotOpacity(brightness: Float): Float = (brightness / DimmestShownSlot).coerceIn(0f, 1f)
+
+private val DimmestShownSlot = SlotAlpha.filter { it > 0f }.min()
+
 private fun slotValue(values: FloatArray, distance: Float): Float {
     val x = (distance + FocusSlot).coerceIn(0f, values.lastIndex.toFloat())
     val k = x.toInt().coerceAtMost(values.lastIndex - 1)
@@ -851,6 +860,15 @@ private fun GameColumn(
                     shape = BelowRow((RowCenterY + height / 2f - 6f).dp.toPx())
                 }
         ) {
+            // With the ribbon wave behind the page, the unfocused covers sit on soft dark backdrops as the Apps page's icons do,
+            // so the wave's lines don't run through them; all of them first, so none is drawn over a neighbouring cover.
+            if (backdrop) {
+                for (i in visibleRows) {
+                    if (games.getOrNull(i) != null || (showPlus && i == games.size)) {
+                        key("backdrop", games.getOrNull(i)?.id ?: "plus") { CoverBackdrop(index = i, position = listPosition, columnAlpha = columnAlpha) }
+                    }
+                }
+            }
             for (i in visibleRows) {
                 val game = games.getOrNull(i)
                 if (game == null) {
@@ -871,6 +889,47 @@ private fun GameColumn(
     }
 }
 
+/** How far the dark backdrop behind an unfocused cover reaches, as a multiple of the cover's size (the Apps page's 360 / 212). */
+private const val CoverBackdropReach = 360f / 212f
+
+/**
+ * The soft dark backdrop behind an unfocused cover (the same as the Apps page's behind its icons, stretched to the cover's
+ * shape): 30% black under the cover, fading out to [CoverBackdropReach] times its size. It fades out as the cover reaches the
+ * focus (which has its glow instead) and with the cover at the ends of the list.
+ */
+@Composable
+private fun CoverBackdrop(index: Int, position: State<Float>, columnAlpha: () -> Float) {
+    val slideIndex by animateFloatAsState(index.toFloat(), tween(260, easing = EaseInOut), label = "coverBackdropIndex")
+    Box(
+        Modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                val distance = slideIndex - position.value
+                alpha = (abs(distance)).coerceIn(0f, 1f) * slotOpacity(slotValue(SlotAlpha, distance)) * columnAlpha()
+            }
+            .drawBehind {
+                val distance = slideIndex - position.value
+                val width = (CoverWidth * slotValue(SlotScale, distance) * CoverBackdropReach).dp.toPx()
+                val height = width * CoverAspect
+                val center = Offset(ListCenterX.dp.toPx(), slotValue(SlotCenterY, distance).dp.toPx())
+                val radius = width / 2f
+                // A round gradient squashed to the cover's proportions.
+                scale(1f, height / width, center) {
+                    drawCircle(CoverBackdropBrush(center, radius), radius, center)
+                }
+            }
+    )
+}
+
+private fun CoverBackdropBrush(center: Offset, radius: Float) = Brush.radialGradient(
+    0f to Color.Black.copy(alpha = 0.3f),
+    0.58f to Color.Black.copy(alpha = 0.3f),
+    0.8f to Color.Black.copy(alpha = 0.12f),
+    1f to Color.Transparent,
+    center = center,
+    radius = radius,
+)
+
 /** One 16:9 cover in the list: big on the focus, smaller and dimmer around it. */
 @Composable
 private fun CoverSlot(uri: String?, index: Int, position: State<Float>, columnAlpha: () -> Float, press: State<Float>, heldAmount: State<Float>, plus: Boolean = false, quiet: Boolean = false) {
@@ -889,7 +948,7 @@ private fun CoverSlot(uri: String?, index: Int, position: State<Float>, columnAl
                 layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(x, y) }
             }
             .graphicsLayer {
-                alpha = slotValue(SlotAlpha, slideIndex - position.value) * columnAlpha()
+                alpha = slotOpacity(slotValue(SlotAlpha, slideIndex - position.value)) * columnAlpha()
                 // The press-in when A launches the game: only the focused cover dips.
                 val pressed = 1f + (press.value - 1f) * (1f - abs(slideIndex - position.value)).coerceIn(0f, 1f)
                 scaleX = pressed
@@ -911,15 +970,20 @@ private fun CoverSlot(uri: String?, index: Int, position: State<Float>, columnAl
                     // The placeholder: the status pill's fill and its dim background outline, no glow and no white outline.
                     val radius = coverRadius(size.width / CoverWidth.dp.toPx()).dp.toPx()
                     drawFadingOutline(radius, 24.dp.toPx(), BackgroundOutline, gain = 1f)
-                    return@drawWithContent
+                } else {
+                    // The white-to-transparent outline: steady and neutral when unfocused, brighter and blinking when focused.
+                    val focus = (1f - abs(slideIndex - position.value)).coerceIn(0f, 1f) * (1f - heldAmount.value)
+                    // Edit Mode is about the platforms, so a game cover doesn't blink there (the "+" tile still does).
+                    // Only the focused cover reads the pulse: the others don't change, so they aren't redrawn with it.
+                    val level = if (focus <= 0f || (quiet && !plus)) 1f else pulse().coerceIn(0f, 1f)
+                    val strength = UnfocusedOutline + focus * (level - UnfocusedOutline)
+                    val scale = size.width / CoverWidth.dp.toPx()
+                    drawFadingOutline(coverRadius(scale).dp.toPx(), OutlineDepth.dp.toPx() * scale.coerceAtLeast(0.6f), strength, gain = 1f + (FocusedOutlineGain - 1f) * focus)
                 }
-                // The white-to-transparent outline: steady and neutral when unfocused, brighter and blinking when focused.
-                val focus = (1f - abs(slideIndex - position.value)).coerceIn(0f, 1f) * (1f - heldAmount.value)
-                // Edit Mode is about the platforms, so a game cover doesn't blink there (the "+" tile still does).
-                val level = if (quiet && !plus) 1f else pulse().coerceIn(0f, 1f)
-                val strength = UnfocusedOutline + focus * (level - UnfocusedOutline)
-                val scale = size.width / CoverWidth.dp.toPx()
-                drawFadingOutline(coverRadius(scale).dp.toPx(), OutlineDepth.dp.toPx() * scale.coerceAtLeast(0.6f), strength, gain = 1f + (FocusedOutlineGain - 1f) * focus)
+                // The covers around the focus are darker, not see-through: black over them (outline and all), so nothing
+                // behind them (the wave) shows through.
+                val dim = 1f - slotValue(SlotAlpha, slideIndex - position.value)
+                if (dim > 0.005f) drawRect(Color.Black.copy(alpha = dim.coerceIn(0f, 1f)))
             }
     ) {
         Crossfade(targetState = bitmap, animationSpec = tween(300), label = "coverSwap") { image ->

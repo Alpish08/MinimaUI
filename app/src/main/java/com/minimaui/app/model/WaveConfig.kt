@@ -38,8 +38,6 @@ enum class WaveKey(
     WhiteOpacity("wop", 0f, 100f, 1f, 50f, 25f, 55f),
     RedWidth("rw", 0.5f, 6f, 0.1f, 1.0f, 1.2f, 3.2f),
     WhiteWidth("ww", 0.5f, 6f, 0.1f, 1.0f, 0.8f, 2.4f),
-    // How soft the lines are (a bell curve this many design px wide around each, red one too).
-    Blur("blur", 0f, 20f, 1f, 1f, 0f, 3f),
 
     // The sheets and their light. Every default leaves the look exactly as it was before these existed (an old wave file reads the same).
     // A line can be a ribbon: a second edge this many design px below it, the band between them filled, with threads in between.
@@ -51,7 +49,7 @@ enum class WaveKey(
     // A soft halo around every line (light trails).
     Glow("glow", 0f, 100f, 1f, 0f, 0f, 60f),
     // Depth of field: lines further from the red one get blurrier and dimmer.
-    Focus("dof", 0f, 100f, 1f, 0f, 0f, 60f, randOn = 0.5f),
+    Focus("dof", 0f, 100f, 1f, 0f, 0f, 60f, randOn = 0.65f),
     // A wide glow with a pale core along the middle of the wave.
     Band("band", 0f, 100f, 1f, 0f, 0f, 70f),
     // A highlight that slides slowly along the lines.
@@ -209,6 +207,5 @@ height = 54
 wop = 27
 rw = 3.6
 ww = 1.9
-blur = 3
 seeds = 2.022,0.3458,0.0502,0.1545,0.2692,0.0225,0.9574,0.0545,1.1642,0.7292,0.1567,0.528,2.6921,0.3653,0.8132,0.4013,2.7592,0.7131,0.1107,0.2331,3.5798,0.818,0.1442,0.7977,0.6339,0.6153,0.303,0.369,3.5172,0.3228,0.3113,0.1705,1.7043,0.8757,0.5953,0.5195,0.6176,0.7807,0.8702,0.4816,5.9897,0.5163,0.4652,0.8078,5.6436,0.5919,0.3887,0.5488,4.3015,0.823,0.95,0.7311,1.4604,0.2766,0.6286,0.4827,3.2775,0.8079,0.073,0.8858,3.3137,0.562,0.6332,0.8975
 """
