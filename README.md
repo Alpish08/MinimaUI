@@ -34,7 +34,7 @@ When nothing has been touched for 30 seconds the focus glow and the scrolling ti
 * **Edit Mode**: rearrange favorites, platforms and apps; remove games from the library (and bring them back from the *Hidden Games* page of *Edit Current Platform*, in Edit Mode on All Games).
 * **Per-game and per-platform emulators**: pick any installed app as the emulator, or go back to the original.
 * **Platform tiles** show the platform's logo from `MinimaUI/Platform Icons/` when it has one (named like the console, e.g. `Sony Playstation.png`), otherwise its name as text; give a platform its own title or image if you like. A platform shows on All Games while it has games (Android and Steam always); switch any platform on or off by hand in Customization (in Edit Mode on All Games or Favorites).
-* Optional animated wave, background music, UI sounds, your own boot animation, settings backups, and an ambient clock.
+* An optional animated XMB wave with its own blur and brightness on each page, background music, UI sounds, your own boot animation, settings backups, and an ambient clock.
 * Touch, buttons or both.
 
 # Supported platforms and emulators (for now)
@@ -132,7 +132,11 @@ Sounds are not included. If you want a PS Vita feel, the community-made [PS Vita
 **Steam launchers**: besides GameHub, a Steam game can be started by GameNative (by its Steam App ID) or GameHub Lite: choose the app as the game's *Custom Emulator*, or for the whole Steam platform in Edit Mode (*Edit Current Platform → Default Emulator*). Games pinned from Moonlight ("Add to home screen") show up under Windows, like the Artemis ones. Neither launcher has been tried on a device yet.
 
 # The wave
-The first time you run MinimaUI the XMB wave is on, in the author's own look. Change it in *Start → Customization → XMB Wave* (OFF, ON = the original wave, CUSTOM = the MinimaUI ribbon). With CUSTOM selected you can randomize it (**X**) and save the current look (**Y**) as a file in `MinimaUI/Backup/Custom Wave/`; restore one from *Backup / Restore*. The files are plain `key = value` text, so you can also tune them by hand.
+The first time you run MinimaUI the XMB wave is on, in the author's own look. *Start → Customization → XMB Wave* switches it between OFF, ORIGINAL (the original wave) and CUSTOM (the MinimaUI wave).
+
+With CUSTOM selected, press **X** on that row to **Customize** it. There is a page for each of All Games, Apps and Favorites, each with a **Blur** and a **Brightness** slider and a preview of the wave. At 0% brightness the wave isn't drawn behind that page at all, which also saves battery. Turn the pages with **L1 / R1**, the right stick, a swipe or the page dots. **X** rolls a new random wave, and **Y** saves the current one as a file in `MinimaUI/Backup/Custom Wave/`; restore one from *Backup / Restore*. The files are plain `key = value` text, so you can also fine-tune them by hand.
+
+Out of the box the wave is sharp behind All Games, blurred and dimmer behind Apps, and off behind Favorites. Turn it on there and the Favorites dock becomes frosted glass over it.
 
 # Optional extras
 * **Volume and brightness bars** over other apps: MinimaUI has an accessibility service for this (Android Settings → Accessibility → MinimaUI). It's off until you enable it, and nothing else needs it. The same service also watches the Home button (that one key only, nothing else you press) so that **holding Home for 5 seconds restarts MinimaUI**, which replays the boot animation.
