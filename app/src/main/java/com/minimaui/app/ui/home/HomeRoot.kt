@@ -83,6 +83,7 @@ import com.minimaui.app.ui.components.WaveButtonRipples
 import com.minimaui.app.ui.components.WaveRibbon
 import com.minimaui.app.ui.components.XmbWave
 import com.minimaui.app.model.WaveKey
+import com.minimaui.app.model.WavePage
 import com.minimaui.app.ui.components.ProvideFocusPulse
 import com.minimaui.app.ui.components.LevelBackdrop
 import com.minimaui.app.ui.components.LevelCenterX
@@ -104,6 +105,7 @@ import com.minimaui.app.ui.menu.TitleKeyboardDialog
 import com.minimaui.app.ui.menu.TitleEditDialog
 import com.minimaui.app.ui.theme.Dimens
 import com.minimaui.app.ui.theme.OledBlack
+import androidx.compose.ui.layout.layout
 
 private enum class HomePage { Favorites, AllGames, Apps }
 
@@ -228,6 +230,9 @@ fun HomeRoot(
     val triggers = remember { BooleanArray(2) }
     // The shoulder buttons send ripples along the Minima ribbon.
     val pulses = remember { WavePulses() }
+    // The custom wave's time, kept here so it carries on where it was after a page without it, and the frosted copy behind
+    // the Favorites dock moves with it.
+    val waveTimeline = remember { com.minimaui.app.ui.components.WaveTimeline() }
     // Moving between All Games and Apps sends a ripple in from the side the other screen lies on (the content slides that way too).
     var lastScreen by remember { mutableStateOf(state.screen) }
     LaunchedEffect(state.screen) {
@@ -496,33 +501,34 @@ fun HomeRoot(
                 HomeScreen.AllGames -> HomePage.AllGames
                 HomeScreen.Apps -> HomePage.Apps
             }
-            // The custom wave is one wave behind All Games and Apps, so switching between them doesn't redraw or restart it: All Games
-            // shows it as it is, Apps blurred and dimmed as Customize says; Favorites has none. While it is being customized it shows
-            // only in the preview. The original wave is drawn by the pages themselves.
+            // The custom wave is one wave behind every page, so switching pages doesn't redraw or restart it: each shows it as
+            // blurred and as bright as its Customize page says (at 0% brightness it isn't drawn). While it is being customized it
+            // shows only in the preview. The original wave is drawn by the pages themselves.
             val ribbon = settings.waveStyle == WaveRibbon
-            val onApps = shownPage == HomePage.Apps
-            val ribbonLevel by animateFloatAsState(
-                when {
-                    state.waveEditOpen || shownPage == HomePage.Favorites -> 0f
-                    onApps -> 1f - settings.waveAppsDim / 100f
-                    else -> 1f
-                },
-                tween(350), label = "ribbonLevel"
+            val pageLook = settings.wavePageLook(
+                when (shownPage) {
+                    HomePage.AllGames -> WavePage.AllGames
+                    HomePage.Apps -> WavePage.Apps
+                    HomePage.Favorites -> WavePage.Favorites
+                }
             )
-            val ribbonSoft by animateFloatAsState(if (onApps) 1f + settings.waveAppsBlur / 100f * AppsMaxBlur else 1f, tween(350), label = "ribbonSoft")
+            val ribbonLevel by animateFloatAsState(if (state.waveEditOpen) 0f else pageLook.brightness / 100f, tween(350), label = "ribbonLevel")
+            val ribbonSoft by animateFloatAsState(1f + pageLook.blur / 100f * WaveMaxBlur, tween(350), label = "ribbonSoft")
             if (ribbon && ribbonLevel > 0.001f) {
                 XmbWave(
                     style = WaveRibbon,
                     config = settings.wave,
                     brightness = ribbonLevel,
                     soft = ribbonSoft,
+                    timeline = waveTimeline,
                     pulses = pulses,
-                    // Blurred well enough (behind Apps) that half the resolution doesn't show.
+                    // Blurred well enough that half the resolution doesn't show.
                     lowRes = ribbonSoft >= 2f,
                     modifier = Modifier.fillMaxSize()
                 )
             }
             val pageWave = if (ribbon) WaveOff else settings.waveStyle
+            val favoritesLook = settings.wavePageLook(WavePage.Favorites)
             BlurFadeSwitch(
                 targetState = shownPage,
                 // Favorites is home: the libraries are one step in (and back out again); All Games and Apps lie side by side.
@@ -573,6 +579,10 @@ fun HomeRoot(
                                 is FavView.Folder -> com.minimaui.app.R.drawable.ic_folder
                                 FavView.Favorites -> null
                             },
+                            // With the custom wave behind Favorites, the dock is frosted glass: the wave shows through it, blurred more.
+                            backdrop = if (ribbon && favoritesLook.shown) {
+                                { DockWave(settings.wave, favoritesLook, waveTimeline, hidden = state.waveEditOpen) }
+                            } else null,
                         )
                     }
                     HomePage.AllGames -> AllGamesScreen(
@@ -671,13 +681,15 @@ fun HomeRoot(
                     onSeekList = state::touchMenuSeek,
                     customizing = state.waveEditOpen,
                     customize = WaveCustomize(
+                        page = state.waveEditPage,
+                        titles = WavePage.entries.map { it.title },
+                        looks = WavePage.entries.map { settings.wavePageLook(it).let { l -> l.blur to l.brightness } },
                         selected = state.waveEditIndex,
-                        blur = settings.waveAppsBlur,
-                        dim = settings.waveAppsDim,
-                        // The wave as it is: the sliders only change it behind Apps.
+                        // The wave as it is: the sliders only change how the pages show it.
                         preview = { m -> XmbWave(style = WaveRibbon, config = settings.wave, modifier = m) },
-                        onSeek = { i, percent -> state.touchWaveSeek(i, percent / 100f) },
-                        onSelect = { i -> state.touchWaveSeek(i, (if (i == 0) settings.waveAppsBlur else settings.waveAppsDim) / 100f) },
+                        onSeek = state::touchWaveSeek,
+                        onSelect = state::touchWaveSlider,
+                        onPage = { state.changeWaveEditPage(it) },
                         onClose = state::closeWaveEdit,
                     ),
                 )
@@ -858,6 +870,42 @@ private fun launchOrigin(state: HomeState): Offset = when (state.screen) {
         ?.let { Offset(Dimens.PanelX.value + it.centerX, Dimens.PanelY.value + it.centerY) }
 } ?: Offset(Dimens.DesignWidth / 2f, Dimens.DesignHeight / 2f)
 
-/** The custom wave's blur behind Apps at 100% on the Blur slider (the shader's soft, 1 = none). */
-private const val AppsMaxBlur = 5f
+/** The custom wave's blur at 100% on a page's Blur slider (the shader's soft, 1 = none). */
+private const val WaveMaxBlur = 5f
 
+/** How much more the Favorites dock blurs the wave behind it (added to the page's blur, in the shader's soft). */
+private const val DockBlur = 3f
+
+/**
+ * The custom wave as the Favorites dock shows it: the same wave at the same moment (it follows [timeline]), blurred by the
+ * page's blur and [DockBlur] more, at half resolution. It is laid out over the whole screen and placed back by the dock's
+ * offset, so it lines up with the wave around the dock; the black under it hides the sharper wave there.
+ */
+@Composable
+private fun DockWave(config: com.minimaui.app.model.WaveConfig, look: com.minimaui.app.model.WavePageLook, timeline: com.minimaui.app.ui.components.WaveTimeline, hidden: Boolean) {
+    val level by animateFloatAsState(if (hidden) 0f else look.brightness / 100f, tween(350), label = "dockLevel")
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(OledBlack)
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(
+                    androidx.compose.ui.unit.Constraints.fixed(Dimens.DesignWidth.dp.roundToPx(), Dimens.DesignHeight.dp.roundToPx())
+                )
+                layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(-Dimens.PanelX.roundToPx(), -Dimens.PanelY.roundToPx()) }
+            }
+    ) {
+        if (level > 0.001f) {
+            XmbWave(
+                style = WaveRibbon,
+                config = config,
+                brightness = level,
+                soft = 1f + look.blur / 100f * WaveMaxBlur + DockBlur,
+                timeline = timeline,
+                drives = false,
+                lowRes = true,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+    }
+}

@@ -99,6 +99,8 @@ fun BentoScreen(
     showLauncher: Boolean = false,
     viewLabel: String? = null,
     viewIcon: Int? = null,
+    // Drawn inside the dock, under everything on it (the frosted custom wave); the dock's fill lets it show through.
+    backdrop: (@Composable () -> Unit)? = null,
 ) {
     val density = LocalDensity.current.density
     val pagerState = rememberPagerState(initialPage = page, pageCount = { maxOf(pageCount, 1) })
@@ -158,9 +160,18 @@ fun BentoScreen(
                 .offset(Dimens.PanelX, Dimens.PanelY)
                 .size(Dimens.PanelWidth, Dimens.PanelHeight)
                 .clip(panelShape)
-                .background(SurfacePanel)
+                .then(if (backdrop == null) Modifier.background(SurfacePanel) else Modifier)
                 .backgroundOutline(depth = 24.dp, corner = Dimens.FavoritesPanelCorner)
         ) {
+            if (backdrop != null) {
+                backdrop()
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(SurfacePanel.copy(alpha = DockSeeThrough))
+                        .backgroundOutline(depth = 24.dp, corner = Dimens.FavoritesPanelCorner)
+                )
+            }
             HorizontalPager(
                 state = pagerState,
                 userScrollEnabled = false,
@@ -461,3 +472,6 @@ private const val EdgeFadeAtRest = 40f
 private const val EdgeFadeMoving = 260f
 private const val SwipeDistance = 100f
 private const val EditEdgeZone = 90f
+
+/** The dock's fill opacity while the custom wave shows behind Favorites (frosted, see the backdrop). */
+private const val DockSeeThrough = 0.4f

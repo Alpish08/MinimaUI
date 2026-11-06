@@ -13,6 +13,7 @@ import kotlin.math.roundToInt
 import com.minimaui.app.data.AndroidGames
 import com.minimaui.app.data.GameHubGames
 import com.minimaui.app.model.AppEntry
+import com.minimaui.app.model.WavePage
 import com.minimaui.app.model.AppLibrary
 import com.minimaui.app.data.InstalledApp
 import com.minimaui.app.ui.components.WaveOriginal
@@ -111,7 +112,7 @@ class HomeState(
         get() = listOf(
             screen, selectedPlatformIndex, gameIndex, favoritesNav.page, favoritesNav.slot, appsNav.page, appsNav.slot,
             menuOpen, menuFocus, menuCategory, menuPage, menuAction, pickerIndex, searchIndex, searchOnResults, searchKey, held, settings.volume,
-            waveEditOpen, waveEditIndex, settings.wave.values.contentHashCode(), settings.waveAppsBlur, settings.waveAppsDim,
+            waveEditOpen, waveEditPage, waveEditIndex, settings.wave.values.contentHashCode(), WavePage.entries.map(settings::wavePageLook),
             moreOpen, moreIndex, folderPickerOpen, folderIndex,
         ).hashCode()
 
@@ -196,9 +197,14 @@ class HomeState(
     var menuPage by mutableIntStateOf(0)
         private set
 
-    /** The custom wave's Customize screen (the menu's sub-box slides over to hold it): open, and its slider (0 blur, 1 dim). */
+    /**
+     * The custom wave's Customize screen (the menu's sub-box slides over to hold it): open, its page (one per [WavePage]) and
+     * the slider on it (0 blur, 1 brightness).
+     */
     val waveEditOpen: Boolean get() = menuOpen && waveEditShown
     private var waveEditShown by mutableStateOf(false)
+    var waveEditPage by mutableIntStateOf(0)
+        private set
     var waveEditIndex by mutableIntStateOf(0)
         private set
     private var menuContext by mutableStateOf(MenuContext.Favorites)
@@ -1117,6 +1123,14 @@ class HomeState(
      * as L1/R1 there). Ignored while a menu or dialog is open.
      */
     fun onRightStick(direction: Direction): Boolean {
+        // In the wave's Customize screen it turns its pages, like L1 / R1.
+        if (waveEditOpen) {
+            return when (direction) {
+                Direction.Left -> changeWaveEditPage(-1)
+                Direction.Right -> changeWaveEditPage(1)
+                else -> false
+            }
+        }
         // In the menu the stick turns the pages of a category that has them (Customization).
         if (menuOpen && !pickerOpen && !searchOpen && !isEditingTitle && detailsGame == null && menuPageCount > 1) {
             return when (direction) {
@@ -1659,7 +1673,23 @@ class HomeState(
 
     private fun openWaveEdit() {
         waveEditShown = true
+        waveEditPage = 0
         waveEditIndex = 0
+    }
+
+    /** Another page of Customize ([delta] -1 the one before, +1 the next; touch: a swipe or a page dot). */
+    fun changeWaveEditPage(delta: Int): Boolean {
+        val target = (waveEditPage + delta).coerceIn(0, WavePage.entries.size - 1)
+        if (target == waveEditPage) return false
+        waveEditPage = target
+        haptic()
+        pageSound()
+        return true
+    }
+
+    /** A tap on slider card [index]: it is the one the left and right keys change. */
+    fun touchWaveSlider(index: Int) {
+        waveEditIndex = index.coerceIn(0, 1)
     }
 
     fun closeWaveEdit() {
@@ -1677,6 +1707,8 @@ class HomeState(
             Key.DirectionRight -> stepWaveEdit(1)
             Key.ButtonX -> if (!isRepeat) settings.randomizeWave()
             Key.ButtonY -> if (!isRepeat) actions.saveWave()
+            Key.ButtonL1 -> if (!isRepeat) changeWaveEditPage(-1)
+            Key.ButtonR1 -> if (!isRepeat) changeWaveEditPage(1)
             Key.ButtonB, Key.Escape -> if (!isRepeat) closeWaveEdit()
             // The other buttons do nothing here (and never reach the menu under it).
             else -> return false
@@ -1684,18 +1716,24 @@ class HomeState(
         return true
     }
 
+    /** The page Customize is showing. */
+    val waveEditWavePage: WavePage get() = WavePage.entries[waveEditPage.coerceIn(0, WavePage.entries.size - 1)]
+
     /** Left (-1) or right (+1): the selected slider a couple of percent down or up. */
     private fun stepWaveEdit(delta: Int) {
+        val look = settings.wavePageLook(waveEditWavePage)
         val step = delta * WaveSliderStep
-        if (waveEditIndex == 0) settings.setWaveApps(settings.waveAppsBlur + step, settings.waveAppsDim)
-        else settings.setWaveApps(settings.waveAppsBlur, settings.waveAppsDim + step)
+        if (waveEditIndex == 0) settings.setWavePageLook(waveEditWavePage, look.blur + step, look.brightness)
+        else settings.setWavePageLook(waveEditWavePage, look.blur, look.brightness + step)
     }
 
-    /** A tap or drag on slider [index] (0 blur, 1 dim) at [fraction] of its width. */
-    fun touchWaveSeek(index: Int, fraction: Float) {
+    /** A tap or drag on slider [index] (0 blur, 1 brightness) at [percent] of its width. */
+    fun touchWaveSeek(index: Int, percent: Int) {
         waveEditIndex = index.coerceIn(0, 1)
-        val value = (kotlin.math.round(fraction.coerceIn(0f, 1f) * 100f / WaveSliderStep) * WaveSliderStep).toInt()
-        if (waveEditIndex == 0) settings.setWaveApps(value, settings.waveAppsDim) else settings.setWaveApps(settings.waveAppsBlur, value)
+        val value = ((percent.coerceIn(0, 100) + WaveSliderStep / 2) / WaveSliderStep) * WaveSliderStep
+        val look = settings.wavePageLook(waveEditWavePage)
+        if (waveEditIndex == 0) settings.setWavePageLook(waveEditWavePage, value, look.brightness)
+        else settings.setWavePageLook(waveEditWavePage, look.blur, value)
     }
 
     /** Moves the highlighted entry one step; false if there is nowhere to go that way. */

@@ -182,22 +182,31 @@ class Settings(platforms: List<Platform>, private val store: LibraryStore) {
     }
 
     /**
-     * How blurred and how dimmed (0..100 % each) the custom wave is behind the Apps page. All Games shows it as it is, and
-     * Favorites never has it behind.
+     * How blurred and how bright (0..100 % each) the custom wave is behind each page; at 0% brightness it isn't drawn there.
+     * Out of the box: as it is on All Games, blurred and dimmed on Apps, none behind Favorites.
      */
-    var waveAppsBlur by mutableIntStateOf(loadAppsWave(0, DefaultAppsBlur))
-        private set
-    var waveAppsDim by mutableIntStateOf(loadAppsWave(1, DefaultAppsDim))
-        private set
+    fun wavePageLook(page: WavePage): WavePageLook = pageLooks[page.ordinal]
 
-    fun setWaveApps(blur: Int, dim: Int) {
-        waveAppsBlur = blur.coerceIn(0, 100)
-        waveAppsDim = dim.coerceIn(0, 100)
-        store.saveString(KEY_WAVE_APPS, "$waveAppsBlur,$waveAppsDim")
+    fun setWavePageLook(page: WavePage, blur: Int, brightness: Int) {
+        val look = WavePageLook(blur.coerceIn(0, 100), brightness.coerceIn(0, 100))
+        pageLooks = pageLooks.toMutableList().also { it[page.ordinal] = look }
+        store.saveString(KEY_WAVE_LOOK + page.name, "${look.blur},${look.brightness}")
     }
 
-    private fun loadAppsWave(index: Int, default: Int): Int =
-        store.loadString(KEY_WAVE_APPS)?.split(",")?.getOrNull(index)?.trim()?.toIntOrNull()?.coerceIn(0, 100) ?: default
+    private var pageLooks by mutableStateOf(WavePage.entries.map { page ->
+        store.loadString(KEY_WAVE_LOOK + page.name)?.split(",")?.mapNotNull { it.trim().toIntOrNull() }?.takeIf { it.size == 2 }
+            ?.let { WavePageLook(it[0].coerceIn(0, 100), it[1].coerceIn(0, 100)) }
+            ?: defaultLook(page)
+    })
+
+    private fun defaultLook(page: WavePage): WavePageLook = when (page) {
+        WavePage.AllGames -> WavePageLook(0, 100)
+        // The Apps look of the build before there were pages (blur and dim), if there is one.
+        WavePage.Apps -> store.loadString(KEY_WAVE_APPS)?.split(",")?.mapNotNull { it.trim().toIntOrNull() }?.takeIf { it.size == 2 }
+            ?.let { WavePageLook(it[0].coerceIn(0, 100), (100 - it[1]).coerceIn(0, 100)) }
+            ?: WavePageLook(40, 65)
+        WavePage.Favorites -> WavePageLook(40, 0)
+    }
 
     /** Rolls a new custom wave look (and shows it: the wave switches to CUSTOM). */
     fun randomizeWave() = applyWave(wave.randomized())
@@ -224,8 +233,7 @@ class Settings(platforms: List<Platform>, private val store: LibraryStore) {
         private const val WaveRibbonStyle = 2
         private const val WaveStyleCount = 3
         private const val KEY_WAVE_APPS = "waveApps"
-        private const val DefaultAppsBlur = 40
-        private const val DefaultAppsDim = 35
+        private const val KEY_WAVE_LOOK = "waveLook."
         private const val KEY_WAVE_STYLE = "waveStyle"
         private const val KEY_TOUCH_GESTURES = "touchGestures"
         private const val KEY_UI_FPS = "uiFps"

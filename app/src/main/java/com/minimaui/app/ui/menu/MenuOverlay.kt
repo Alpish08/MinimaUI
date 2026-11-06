@@ -372,6 +372,14 @@ fun MenuOverlay(
                     }
                     // In Customize only the sliders take taps (on their bars); a tap on a card selects it.
                     if (customizing) {
+                        val pageCount = customize.titles.size
+                        if (pageCount > 1 && y in (PageDotsY - 24f)..(PageDotsY + 24f)) {
+                            val center = EditBoxX + SubBox.width / 2f
+                            val pitch = PageDotSize + PageDotGap
+                            val index = ((x - center) / pitch + (pageCount - 1) / 2f).roundToInt().coerceIn(0, pageCount - 1)
+                            if (kotlin.math.abs(x - (center + (index - (pageCount - 1) / 2f) * pitch)) <= 30f) customize.onPage(index - customize.page)
+                            return@detectTapGestures
+                        }
                         (0..1).firstOrNull { i -> editCardRect(i).let { x >= it.x && x <= it.x + it.width && y >= it.y && y <= it.y + it.height } }
                             ?.let { customize.onSelect(it) }
                         return@detectTapGestures
@@ -397,6 +405,15 @@ fun MenuOverlay(
             // Touch: drag up or down to scroll a long list (the ROM folders).
             .then(if (layout.scrolls && !customizing) Modifier.verticalDragSteps(95f, onStepList) else Modifier)
             // Touch: drag sideways to turn the pages; they follow the finger and settle on release.
+            // Touch, in Customize: a swipe sideways turns its page.
+            .pointerInput(customizing) {
+                if (!customizing) return@pointerInput
+                var moved = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { moved = 0f },
+                    onDragEnd = { if (kotlin.math.abs(moved) > 120f * density) customize.onPage(if (moved < 0f) 1 else -1) },
+                ) { _, dx -> moved += dx }
+            }
             .pointerInput(category, page, customizing) {
                 if (pages <= 1 || customizing) return@pointerInput
                 val width = SubBox.width * density
@@ -794,12 +811,15 @@ private fun SliderCard(title: String, value: Int, active: Boolean, rect: UiRect,
  * (0..100 %), the wave for the preview box and the callbacks.
  */
 class WaveCustomize(
+    val page: Int = 0,
+    val titles: List<String> = emptyList(),
+    /** Each page's (blur, brightness), in %. */
+    val looks: List<Pair<Int, Int>> = emptyList(),
     val selected: Int = 0,
-    val blur: Int = 0,
-    val dim: Int = 0,
     val preview: @Composable (Modifier) -> Unit = {},
     val onSeek: (index: Int, percent: Int) -> Unit = { _, _ -> },
     val onSelect: (index: Int) -> Unit = {},
+    val onPage: (delta: Int) -> Unit = {},
     val onClose: () -> Unit = {},
 )
 
@@ -817,41 +837,61 @@ private fun editPhase(t: Float, span: Pair<Float, Float>): Float = ((t - span.fi
 private const val EditBoxX = 50f
 private const val EditCardW = 700f
 private const val EditCardH = 150f
-private const val EditCardPitch = 232f
+private const val EditCardPitch = 240f
+private const val EditCardTop = 218f
+private const val EditTitleY = 125f
 private const val EditPreviewW = 600f
 private const val EditPreviewH = 338f
 private const val EditPreviewCorner = 34f
 private const val EditPreviewX = EditBoxX + 926f + (1694f - EditBoxX - 926f - EditPreviewW) / 2f
 private const val EditPreviewY = 259f
 
-private fun editCardRect(index: Int) = UiRect(
-    EditBoxX + SubBox.width / 2f - EditCardW / 2f,
-    SubBox.y + SubBox.height / 2f - (EditCardPitch + EditCardH) / 2f + index * EditCardPitch,
-    EditCardW,
-    EditCardH
-)
+private fun editCardRect(index: Int) = UiRect(EditBoxX + SubBox.width / 2f - EditCardW / 2f, EditCardTop + index * EditCardPitch, EditCardW, EditCardH)
 
 @Composable
 private fun CustomizeContent(customize: WaveCustomize, progress: () -> Float) {
-    // The sliders: in once the box has arrived, out first on the way back.
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
+    val shape = RoundedCornerShape(SubBoxCorner.dp)
+    // Where the pages are, in page units: it eases to the current one, so they slide inside the box as the menu's do.
+    val position = remember { Animatable(customize.page.toFloat()) }
+    androidx.compose.runtime.LaunchedEffect(customize.page) { position.animateTo(customize.page.toFloat(), tween(360, easing = EaseInOut)) }
+    // The pages: in once the box has arrived, out first on the way back.
     Box(Modifier.fillMaxSize().graphicsLayer { alpha = editPhase(progress(), EditListIn) }) {
-        val grow = ListGrow
-        SelectionGlow(editCardRect(customize.selected).grown(grow).toGlow(60f))
-        for (i in 0..1) {
-            val growW by animateFloatAsState(listGrowth((i - customize.selected).toFloat(), grow, SettingsNeighbor), tween(200), label = "editGrow")
-            SliderCard(
-                title = if (i == 0) "Blur" else "Dim",
-                value = if (i == 0) customize.blur else customize.dim,
-                active = i == customize.selected,
-                rect = editCardRect(i).grown(growW),
-                onSeek = { customize.onSeek(i, it) }
-            )
+        for (p in customize.titles.indices) {
+            val distance = p - position.value
+            if (kotlin.math.abs(distance) >= 1f) continue
+            val here = p == customize.page
+            Box(
+                Modifier
+                    .offset(EditBoxX.dp, SubBox.y.dp)
+                    .size(SubBox.width.dp, SubBox.height.dp)
+                    .clip(shape)
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .offset { IntOffset((distance * SubBox.width * density).roundToInt(), 0) }
+                        .graphicsLayer { alpha = (1f - kotlin.math.abs(distance) * 1.4f).coerceIn(0f, 1f) }
+                        .layout { measurable, constraints ->
+                            // The panel-sized layer, placed back at the panel's origin (it is bigger than the box it sits in).
+                            val placeable = measurable.measure(Constraints.fixed(Dimens.PanelWidth.roundToPx(), Dimens.PanelHeight.roundToPx()))
+                            layout(constraints.maxWidth, constraints.maxHeight) { placeable.place((-EditBoxX).dp.roundToPx(), (-SubBox.y).dp.roundToPx()) }
+                        }
+                ) {
+                    CustomizePage(customize, p, here)
+                }
+            }
         }
-        FocusRing(
-            editCardRect(customize.selected).grown(grow).toGlow(60f),
-            fadeDepth = outlineDepthFor(EditCardH),
-            underStrength = UnfocusedOutline
-        )
+        if (customize.titles.size > 1) {
+            Box(
+                modifier = Modifier
+                    .offset(EditBoxX.dp, (PageDotsY - PageDotSize / 2f).dp)
+                    .size(SubBox.width.dp, PageDotSize.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                PageDots(count = customize.titles.size, current = customize.page, vertical = false, activeSize = PageDotSize.dp, inactiveSize = 14.dp, gap = PageDotGap.dp)
+            }
+        }
     }
     // The preview: it rises into place from a little to the right, growing slightly as it fades in.
     Box(
@@ -884,6 +924,41 @@ private fun CustomizeContent(customize: WaveCustomize, progress: () -> Float) {
                 .backgroundOutline(depth = 18.dp, corner = EditPreviewCorner.dp)
         ) {
             customize.preview(Modifier.fillMaxSize().clip(RoundedCornerShape(EditPreviewCorner.dp)))
+        }
+    }
+}
+
+/** One page of Customize, in the panel's coordinates: the page's name over its Blur and Brightness sliders. */
+@Composable
+private fun CustomizePage(customize: WaveCustomize, page: Int, here: Boolean) {
+    val (blur, brightness) = customize.looks.getOrElse(page) { 0 to 0 }
+    val selected = if (here) customize.selected else -1
+    Box(Modifier.fillMaxSize()) {
+        Box(
+            Modifier.offset(EditBoxX.dp, (EditTitleY - 25f).dp).size(SubBox.width.dp, 50.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(customize.titles.getOrElse(page) { "" }, color = Color(0xFFA8A8AE), fontWeight = FontWeight.Bold, fontSize = 30.sp, maxLines = 1)
+        }
+        if (here) SelectionGlow(editCardRect(selected).grown(ListGrow).toGlow(60f))
+        for (i in 0..1) {
+            val growW by animateFloatAsState(
+                if (here) listGrowth((i - selected).toFloat(), ListGrow, SettingsNeighbor) else 0f, tween(200), label = "editGrow"
+            )
+            SliderCard(
+                title = if (i == 0) "Blur" else "Brightness",
+                value = if (i == 0) blur else brightness,
+                active = i == selected,
+                rect = editCardRect(i).grown(growW),
+                onSeek = { customize.onSeek(i, it) }
+            )
+        }
+        if (here) {
+            FocusRing(
+                editCardRect(selected).grown(ListGrow).toGlow(60f),
+                fadeDepth = outlineDepthFor(EditCardH),
+                underStrength = UnfocusedOutline
+            )
         }
     }
 }

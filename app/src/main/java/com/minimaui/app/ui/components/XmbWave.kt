@@ -412,6 +412,8 @@ fun XmbWave(
     brightness: Float = 1f,
     pulses: WavePulses? = null,
     lowRes: Boolean = false,
+    timeline: WaveTimeline? = null,
+    drives: Boolean = true,
 ) {
     if (!XmbWaveEnabled || style == WaveOff) return
     val ribbon = style == WaveRibbon
@@ -431,18 +433,18 @@ fun XmbWave(
     val current by rememberUpdatedState(config)
     val livePulses by rememberUpdatedState(pulses)
     val resting by rememberUpdatedState(LocalResting.current)
-    var time by remember { mutableFloatStateOf(0f) }
-    var clock by remember { mutableFloatStateOf(0f) }
-    // Only the draw reads [time], so nothing recomposes. The frame clock stops by itself while the app is in the background
-    // (and the screen off, or a game on top), and the first step after it resumes is not counted.
-    LaunchedEffect(Unit) {
+    val waveClock = timeline ?: remember { WaveTimeline() }
+    // Only the draw reads the time, so nothing recomposes. The frame clock stops by itself while the app is in the background
+    // (and the screen off, or a game on top), and the first step after it resumes is not counted. A wave that follows
+    // another's [timeline] doesn't run it.
+    if (drives) LaunchedEffect(waveClock) {
         var last = 0L
         while (true) {
             withFrameNanos { now ->
-                clock = now / 1e9f
+                waveClock.clock = now / 1e9f
                 if (last != 0L) {
                     val seconds = ((now - last) / 1e9f).coerceAtMost(0.25f)
-                    time += seconds * TimePerSecond * current[WaveKey.Speed] / 100f * (if (current[WaveKey.Reverse] > 0.5f) -1f else 1f)
+                    waveClock.time += seconds * TimePerSecond * current[WaveKey.Speed] / 100f * (if (current[WaveKey.Reverse] > 0.5f) -1f else 1f)
                 }
                 last = now
             }
@@ -460,7 +462,7 @@ fun XmbWave(
         (if (lowRes) Modifier.halfResolution() else Modifier.fillMaxSize()).drawBehind {
             if (!ribbon) {
                 shader.setFloatUniform("size", size.width, size.height)
-                shader.setFloatUniform("time", clock % 6283f)
+                shader.setFloatUniform("time", waveClock.clock % 6283f)
                 shader.setFloatUniform("soft", soft.coerceAtLeast(1f))
                 shader.setFloatUniform("gain", brightness)
                 drawRect(ShaderBrush(shader))
@@ -469,7 +471,7 @@ fun XmbWave(
             val c = current
             val scale = size.height / 540f
             val count = c.lineCount
-            c.fillLines(time, lines)
+            c.fillLines(waveClock.time, lines)
             shader.setFloatUniform("size", size.width, size.height)
             shader.setFloatUniform("scale", scale)
             shader.setFloatUniform("L", lines)
@@ -494,11 +496,22 @@ fun XmbWave(
             shader.setFloatUniform("rib", c[WaveKey.RibbonWidth], c[WaveKey.Twist] / 100f, c[WaveKey.RibbonFill] / 100f, c[WaveKey.Threads])
             shader.setFloatUniform("lite", c[WaveKey.Glow] / 100f, c[WaveKey.Band] / 100f, c[WaveKey.Sheen] / 100f, c[WaveKey.Focus] / 100f)
             shader.setFloatUniform("more", c[WaveKey.Particles] / 100f, c[WaveKey.EdgeFade] / 200f, c[WaveKey.Tilt] / 100f, c[WaveKey.Background] / 100f)
-            shader.setFloatUniform("tone", c[WaveKey.RedLine], kotlin.math.abs(time) % 5000f)
+            shader.setFloatUniform("tone", c[WaveKey.RedLine], kotlin.math.abs(waveClock.time) % 5000f)
             drawRect(ShaderBrush(shader))
         }
     )
     }
+}
+
+/**
+ * The time of a wave, kept outside it: the wave keeps its place when it leaves the screen and comes back, and a second
+ * wave (the frosted copy behind the Favorites dock) can follow it exactly.
+ */
+class WaveTimeline {
+    var time by mutableFloatStateOf(0f)
+        internal set
+    var clock by mutableFloatStateOf(0f)
+        internal set
 }
 
 /**
