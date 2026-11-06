@@ -82,13 +82,7 @@ import com.minimaui.app.ui.components.WavePulses
 import com.minimaui.app.ui.components.WaveButtonRipples
 import com.minimaui.app.ui.components.WaveRibbon
 import com.minimaui.app.ui.components.XmbWave
-import com.minimaui.app.ui.components.MinimaWave
-import com.minimaui.app.ui.components.LocalSeeThrough
-import com.minimaui.app.ui.components.MinimaPanelSeeThrough
-import com.minimaui.app.ui.components.WaveMinima
-import com.minimaui.app.ui.components.MinimaAppsDim
-import com.minimaui.app.ui.components.MinimaFavoritesDim
-import com.minimaui.app.ui.components.MinimaFavoritesSoft
+import com.minimaui.app.model.WaveKey
 import com.minimaui.app.ui.components.ProvideFocusPulse
 import com.minimaui.app.ui.components.LevelBackdrop
 import com.minimaui.app.ui.components.LevelCenterX
@@ -104,6 +98,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import com.minimaui.app.ui.components.StatusPill
 import com.minimaui.app.ui.menu.AppPicker
 import com.minimaui.app.ui.menu.MenuOverlay
+import com.minimaui.app.ui.menu.WaveCustomize
 import com.minimaui.app.ui.menu.SearchDialog
 import com.minimaui.app.ui.menu.TitleKeyboardDialog
 import com.minimaui.app.ui.menu.TitleEditDialog
@@ -354,7 +349,6 @@ fun HomeRoot(
     }
 
     ProvideFocusPulse(dimmed, idle) {
-    CompositionLocalProvider(LocalSeeThrough provides if (settings.waveStyle == WaveMinima) MinimaPanelSeeThrough else 1f) {
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -502,34 +496,33 @@ fun HomeRoot(
                 HomeScreen.AllGames -> HomePage.AllGames
                 HomeScreen.Apps -> HomePage.Apps
             }
-            // The Minima ribbon is one wave behind both All Games and Apps (just as bright on both), so switching between them doesn't
-            // redraw it or restart it; it fades out over Favorites. The original wave is drawn by the pages themselves.
+            // The custom wave is one wave behind All Games and Apps, so switching between them doesn't redraw or restart it: All Games
+            // shows it as it is, Apps blurred and dimmed as Customize says; Favorites has none. While it is being customized it shows
+            // only in the preview. The original wave is drawn by the pages themselves.
             val ribbon = settings.waveStyle == WaveRibbon
+            val onApps = shownPage == HomePage.Apps
             val ribbonLevel by animateFloatAsState(
-                when (shownPage) {
-                    HomePage.AllGames, HomePage.Apps -> 1f
-                    HomePage.Favorites -> 0f
+                when {
+                    state.waveEditOpen || shownPage == HomePage.Favorites -> 0f
+                    onApps -> 1f - settings.waveAppsDim / 100f
+                    else -> 1f
                 },
-                tween(350),
-                label = "ribbonLevel"
+                tween(350), label = "ribbonLevel"
             )
+            val ribbonSoft by animateFloatAsState(if (onApps) 1f + settings.waveAppsBlur / 100f * AppsMaxBlur else 1f, tween(350), label = "ribbonSoft")
             if (ribbon && ribbonLevel > 0.001f) {
-                XmbWave(style = WaveRibbon, config = settings.wave, brightness = ribbonLevel, pulses = pulses, modifier = Modifier.fillMaxSize())
+                XmbWave(
+                    style = WaveRibbon,
+                    config = settings.wave,
+                    brightness = ribbonLevel,
+                    soft = ribbonSoft,
+                    pulses = pulses,
+                    // Blurred well enough (behind Apps) that half the resolution doesn't show.
+                    lowRes = ribbonSoft >= 2f,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
-            // The Minima wave fills the screen behind every page: full on All Games, dimmer behind Apps, dimmer and blurred behind Favorites.
-            val vita = settings.waveStyle == WaveMinima
-            val vitaDim by animateFloatAsState(
-                when (shownPage) {
-                    HomePage.AllGames -> 1f
-                    HomePage.Apps -> MinimaAppsDim
-                    HomePage.Favorites -> MinimaFavoritesDim
-                },
-                tween(350),
-                label = "vitaDim"
-            )
-            val vitaSoft by animateFloatAsState(if (shownPage == HomePage.Favorites) MinimaFavoritesSoft else 1f, tween(350), label = "vitaSoft")
-            if (vita) MinimaWave(dim = vitaDim, soft = vitaSoft, modifier = Modifier.fillMaxSize())
-            val pageWave = if (ribbon || vita) WaveOff else settings.waveStyle
+            val pageWave = if (ribbon) WaveOff else settings.waveStyle
             BlurFadeSwitch(
                 targetState = shownPage,
                 // Favorites is home: the libraries are one step in (and back out again); All Games and Apps lie side by side.
@@ -592,7 +585,7 @@ fun HomeRoot(
                         platformTitle = library::platformTitle,
                         wave = pageWave,
                         ribbon = ribbon,
-                        coloredBackground = vita,
+                        coloredBackground = ribbon && settings.wave[WaveKey.Background] > 0f,
                         pressTick = state.pressTick,
                         editMode = state.editMode,
                         held = state.held,
@@ -667,7 +660,7 @@ fun HomeRoot(
                     entriesFor = { p -> state.menuEntriesFor(state.menuCategory, p) },
                     pages = state.menuPageCount,
                     selected = state.menuAction,
-                    hints = state.menuHints,
+                    hints = if (state.waveEditOpen) state.waveEditHints else state.menuHints,
                     editTitle = state.menuEditTitle,
                     onTapCategory = state::touchMenuCategory,
                     onTapEntry = state::touchMenuEntry,
@@ -675,7 +668,18 @@ fun HomeRoot(
                     onSwipePage = state::touchMenuPage,
                     onSeekVolume = state::touchSetVolume,
                     onStepList = state::touchMenuStep,
-                    onSeekList = state::touchMenuSeek
+                    onSeekList = state::touchMenuSeek,
+                    customizing = state.waveEditOpen,
+                    customize = WaveCustomize(
+                        selected = state.waveEditIndex,
+                        blur = settings.waveAppsBlur,
+                        dim = settings.waveAppsDim,
+                        // The wave as it is: the sliders only change it behind Apps.
+                        preview = { m -> XmbWave(style = WaveRibbon, config = settings.wave, modifier = m) },
+                        onSeek = { i, percent -> state.touchWaveSeek(i, percent / 100f) },
+                        onSelect = { i -> state.touchWaveSeek(i, (if (i == 0) settings.waveAppsBlur else settings.waveAppsDim) / 100f) },
+                        onClose = state::closeWaveEdit,
+                    ),
                 )
             }
         }
@@ -843,7 +847,6 @@ fun HomeRoot(
             Box(Modifier.fillMaxSize().graphicsLayer { alpha = launchFade }.background(OledBlack))
         }
     }
-    }
 }
 }
 
@@ -854,3 +857,7 @@ private fun launchOrigin(state: HomeState): Offset = when (state.screen) {
     HomeScreen.Favorites -> state.slotsIn(state.favView, state.favoritesNav.page).getOrNull(state.favoritesNav.slot)
         ?.let { Offset(Dimens.PanelX.value + it.centerX, Dimens.PanelY.value + it.centerY) }
 } ?: Offset(Dimens.DesignWidth / 2f, Dimens.DesignHeight / 2f)
+
+/** The custom wave's blur behind Apps at 100% on the Blur slider (the shader's soft, 1 = none). */
+private const val AppsMaxBlur = 5f
+

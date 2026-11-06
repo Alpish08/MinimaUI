@@ -14,6 +14,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.layout.layout
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.graphics.ShaderBrush
 import com.minimaui.app.model.WaveConfig
 import com.minimaui.app.model.WaveFadeTarget
@@ -30,8 +32,6 @@ const val WaveButtonRipples = false
 const val WaveOff = 0
 const val WaveOriginal = 1
 const val WaveRibbon = 2
-/** The Minima wave: a full-screen background (see [MinimaWave]), behind every page, Favorites included. */
-const val WaveMinima = 3
 
 /** How bright the original wave is behind the Apps page (the icons stay in front); the ribbon isn't dimmed. */
 const val AppsWaveBrightness = 0.66f
@@ -55,9 +55,6 @@ private const val MaxPulses = 4
  */
 private const val RippleCols = 96
 private const val RippleRange = 64f
-
-/** How far in from the left and right edge (a share of the width) the ribbon fades into black. */
-private const val RibbonEdgeFade = 0.2f
 
 /** A ripple lives this long, in seconds; it enters just outside one side, travels across the 960 x 540 design space and dies away. */
 private const val PulseSeconds = 2.4f
@@ -178,12 +175,16 @@ half4 main(float2 p) {
 """
 
 /**
- * The Minima ribbon: a few lines that sway across the screen, the red one in the middle of them, each with a fade
- * under it, in white and red on black. Everything is in a 960 x 540 design space ([scale] converts it to pixels).
+ * The custom wave: a few lines that sway across the screen, the red one in the middle of them, each with a fade under it,
+ * in white and red on black. Everything is in a 960 x 540 design space ([scale] converts it to pixels).
  *
- * Per pixel: the lines' heights and slopes first, then, source-over on black: the white under-fades, the red one's, the
- * white lines, the red line. A fade is (strength * 0.35 * (1 - u) ^ falloff) with u the distance below the line over
- * the fade's depth; half a step of dither noise keeps it from banding. The output is premultiplied.
+ * Per pixel: the lines' heights and slopes first (and nothing more for pixels well above all of them), then, source-over on
+ * black: the background lift and the band glow, the white under-fades, the red one's, the white lines, the red line, the
+ * particles. A line can be a ribbon (a second edge [rib].x below it whose distance swings through zero with the twist, the
+ * band between them filled, threads in between), have a halo (glow), be blurred by the depth of field, and brighten where
+ * the sheen passes. Lines too far from a pixel to light it are skipped. A fade is (strength * 0.35 * (1 - u) ^ falloff) with u the
+ * distance below the line over the fade's depth; half a step of dither noise keeps it from banding. The output is premultiplied.
+ * Every extra is skipped while its value is 0, so a plain look costs what it always did.
  */
 private const val RibbonAgsl = """
 uniform float2 size;
@@ -196,8 +197,12 @@ uniform float4 red;            // fade strength, fade depth, fade falloff, line 
 uniform float4 wht;            // the same for the white lines
 uniform float4 misc;           // red width, white width, dither, brightness
 uniform float2 fadeWho;        // which white lines fade (0 all, 1 top, 2 bottom, 3 near), and a factor for how many
-uniform float blur;            // blur of the whole wave (the Apps page)
+uniform float blur;            // blur of the whole wave (a page's blur)
 uniform float lineBlur;        // extra blur of every line, screen px
+uniform float4 rib;            // ribbon width (design px), twist 0..1, fill 0..1, threads 0..3
+uniform float4 lite;           // glow, band, sheen, depth of field (0..1 each)
+uniform float4 more;           // particles 0..1, edge fade (share of the width, 0 = none), tilt -1..1, background 0..1
+uniform float2 tone;           // red line 1 / white 0, clock (wave time)
 uniform float np;              // ripples alive (0: none, the table is not used)
 uniform shader rip;            // the ripples' table: one row per line, the brightness lift in the last (see RippleCols)
 
@@ -210,12 +215,12 @@ float rippleAt(float row, float x, float w) {
 
 float lineY(float4 l, float x, float w) {
     float a = x / w * 6.2831853 * l.z;
-    return base + l.w + sin(a * 0.9 + l.x) * l.y + sin(a * 1.7 - l.x * 0.6) * l.y * 0.3;
+    return base + l.w + sin(a * 0.9 + l.x) * l.y + sin(a * 1.7 - l.x * 0.6) * l.y * 0.3 + more.z * (x / w - 0.5) * 120.0;
 }
 
 float lineSlope(float4 l, float x, float w) {
     float a = x / w * 6.2831853 * l.z;
-    return (cos(a * 0.9 + l.x) * 0.9 * l.y + cos(a * 1.7 - l.x * 0.6) * 1.7 * l.y * 0.3) * (6.2831853 * l.z / w);
+    return (cos(a * 0.9 + l.x) * 0.9 * l.y + cos(a * 1.7 - l.x * 0.6) * 1.7 * l.y * 0.3) * (6.2831853 * l.z / w) + more.z * 120.0 / w;
 }
 
 bool fades(float i) {
@@ -233,20 +238,86 @@ float cover(float distance, float width, float soft) {
     return exp(-distance * distance / (2.0 * sigma * sigma));
 }
 
+// The light of one line [dy] design px above the pixel ([k] = 1 / sqrt(1 + slope^2) turns it into the distance across the
+// line): its edge, its halo, and as a ribbon its second edge [wi] below, the threads between and the fill.
+float sheet(float dy, float k, float wi, float widthPx, float softPx) {
+    float px = dy * scale * k;
+    float a = cover(px, widthPx, softPx);
+    if (lite.x > 0.0) {
+        float g = (16.0 + softPx / scale) * scale;
+        a += lite.x * 0.35 * exp(-px * px / (2.0 * g * g));
+    }
+    if (rib.x > 0.0) {
+        a += cover((dy - wi) * scale * k, widthPx, softPx) * 0.8;
+        for (int t = 1; t <= 3; t++) {
+            if (float(t) > rib.w) break;
+            a += cover((dy - wi * float(t) / (rib.w + 1.0)) * scale * k, widthPx * 0.8, softPx) * 0.45;
+        }
+        if (rib.z > 0.0) {
+            float lo = min(0.0, wi);
+            float hi = max(0.0, wi);
+            float e = 0.8 / scale;
+            float inside = smoothstep(lo - e, lo + e, dy) * (1.0 - smoothstep(hi - e, hi + e, dy));
+            float u = abs(wi) > 0.01 ? clamp(dy / wi, 0.0, 1.0) : 0.0;
+            float edgeOn = clamp(12.0 / (abs(wi) + 4.0), 0.4, 2.2);
+            a += rib.z * 0.4 * inside * (0.45 + 0.55 * (1.0 - u)) * edgeOn;
+        }
+    }
+    return a;
+}
+
+float hash(float2 p) {
+    p = fract(p * float2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+}
+
 half4 main(float2 p) {
     float2 d = p / scale;
     float w = size.x / scale;
+    float ex = d.x / w;
+    float clock = tone.y;
     float noise = (fract(52.9829189 * fract(dot(p, float2(0.06711056, 0.00583715)))) - 0.5) * misc.z / 255.0;
     float ys[$MaxLines];
-    float ss[$MaxLines];
     float lift = np > 0.5 ? rippleAt($MaxLines.0, d.x, w) : 0.0;
+    float top = 1.0e5;
+    float bottom = -1.0e5;
+    float yb = base;   // the red line's height (arrays can only be indexed by the loop)
     for (int i = 0; i < $MaxLines; i++) {
         if (float(i) >= n) break;
         ys[i] = lineY(L[i], d.x, w);
-        ss[i] = lineSlope(L[i], d.x, w);
         if (np > 0.5) ys[i] += (rippleAt(float(i), d.x, w) * 255.0 - 127.0) / 127.0 * $RippleRange;
+        top = min(top, ys[i] - max(rib.x, 0.0));
+        bottom = max(bottom, ys[i]);
+        if (abs(float(i) - mid) < 0.5) yb = ys[i];
     }
+    // Well above every line, and well below them and their fades, there is nothing to draw, unless the background is lit.
+    float reach = 40.0 + lineBlur / scale * 3.0 + lite.x * 50.0 + lite.y * 110.0 + more.x * 110.0 + lite.w * 24.0 + (blur - 1.0) * 30.0;
+    if (more.w <= 0.0) {
+        if (d.y < top - reach) return half4(0.0);
+        float deep = max(red.x > 0.0 ? red.y : 0.0, wht.x > 0.0 ? wht.y : 0.0);
+        if (d.y > bottom + max(rib.x, 0.0) + max(deep, reach + lite.y * 120.0)) return half4(0.0);
+    }
+
+    // The sheen, sliding along the width.
+    float sx = fract(clock * 0.012) * 1.6 - 0.3;
+    float sh = lite.z * exp(-(ex - sx) * (ex - sx) / 0.015);
+    float3 redC = mix(float3(1.0), float3(1.0, 0.227, 0.227), tone.x);
+
     float4 acc = float4(0.0);
+    if (more.w > 0.0) {
+        float g = more.w * 0.07 * smoothstep(0.0, 0.65, d.y / 540.0);
+        acc = float4(float3(0.92, 0.92, 1.0) * g, g);
+    }
+    // The band glow: wide and soft around the red line, with a pale core.
+    if (lite.y > 0.0) {
+        float dy = d.y - yb;
+        float sb = blur;
+        float g = dy < 0.0 ? exp(-dy * dy / (2.0 * 30.0 * 30.0 * sb)) : exp(-dy * dy / (2.0 * 70.0 * 70.0 * sb));
+        float core = exp(-dy * dy / (2.0 * 13.0 * 13.0 * sb * (1.0 + 0.5 * sh)));
+        float a = lite.y * (g * 0.28 + core * (0.42 + 0.25 * sh)) * misc.w;
+        acc = float4(float3(0.88, 0.88, 0.9) * a, a) + acc * (1.0 - a);
+    }
     // The white under-fades.
     for (int i = 0; i < $MaxLines; i++) {
         float fi = float(i);
@@ -265,41 +336,83 @@ half4 main(float2 p) {
         float u = (d.y - ys[i]) / red.y;
         if (u > 0.0 && u < 1.0) {
             float a = max(red.x * 0.35 * pow(1.0 - u, red.z) + noise, 0.0) * misc.w * (1.0 + lift * 0.5);
-            acc = float4(float3(1.0, 0.227, 0.227) * a, a) + acc * (1.0 - a);
+            acc = float4(redC * a, a) + acc * (1.0 - a);
         }
     }
-    // The white lines, a little fainter the further they are from the red one.
-    for (int i = 0; i < $MaxLines; i++) {
-        float fi = float(i);
-        if (fi >= n) break;
-        if (abs(fi - mid) < 0.5) continue;
-        float c = cover((d.y - ys[i]) * scale / sqrt(1.0 + ss[i] * ss[i]), misc.y * scale, lineBlur + (blur - 1.0) * 3.3);
-        float a = min(c * wht.w * (0.5 + 0.5 * (1.0 - abs(fi - mid) / n)) * misc.w / pow(blur, 0.7) / (1.0 + lineBlur / scale * 0.12) * (1.0 + lift), 1.0);
-        acc = float4(a, a, a, a) + acc * (1.0 - a);
+    float soft0 = lineBlur + (blur - 1.0) * 1.65 * scale;
+    float boost = (1.0 + lift) * (1.0 + 1.2 * sh) / pow(blur, 0.7);
+    // The white lines, a little fainter the further they are from the red one; then the red line over them.
+    for (int pass = 0; pass < 2; pass++) {
+        for (int i = 0; i < $MaxLines; i++) {
+            float fi = float(i);
+            if (fi >= n) break;
+            bool isRed = abs(fi - mid) < 0.5;
+            if (isRed != (pass == 1)) continue;
+            float dof = lite.w * abs(fi - mid) * 3.0 * scale;
+            float softPx = soft0 + dof;
+            float widthPx = (isRed ? misc.x : misc.y) * scale;
+            float wi = rib.x > 0.0 ? rib.x * ((1.0 - rib.y) + rib.y * sin(ex * 6.2831853 * 1.3 + L[i].x * 0.37 + fi * 2.7)) : 0.0;
+            // A line too far above or below to light this pixel is skipped (most of them, for most pixels). How far its light
+            // reaches straight up or down: its edge, blur and halo across the line, stretched by the line's steepest slope.
+            float dy = d.y - ys[i];
+            float steep = (1.41 * L[i].y * 6.2831853 * L[i].z + abs(more.z) * 120.0) / w;
+            float span = (widthPx * 0.5 + 4.0 * softPx + 1.0 + (lite.x > 0.0 ? 3.5 * (16.0 * scale + softPx) : 0.0)) / scale * sqrt(1.0 + steep * steep);
+            if (dy < min(0.0, wi) - span || dy > max(0.0, wi) + span) continue;
+            float sl = lineSlope(L[i], d.x, w);
+            float k = 1.0 / sqrt(1.0 + sl * sl);
+            float c = sheet(dy, k, wi, widthPx, softPx);
+            float dim = 1.0 / (1.0 + (lineBlur + dof) / scale * 0.12);
+            float opacity = isRed ? red.w : wht.w * (0.5 + 0.5 * (1.0 - abs(fi - mid) / n));
+            float a = min(c * opacity * misc.w * dim * boost, 1.0);
+            float3 col = isRed ? redC : float3(1.0);
+            acc = float4(col * a, a) + acc * (1.0 - a);
+        }
     }
-    // The red line.
-    for (int i = 0; i < $MaxLines; i++) {
-        if (float(i) >= n) break;
-        if (abs(float(i) - mid) > 0.5) continue;
-        float c = cover((d.y - ys[i]) * scale / sqrt(1.0 + ss[i] * ss[i]), misc.x * scale, lineBlur + (blur - 1.0) * 3.3);
-        float a = min(c * red.w * misc.w / pow(blur, 0.7) / (1.0 + lineBlur / scale * 0.12) * (1.0 + lift), 1.0);
-        acc = float4(float3(1.0, 0.227, 0.227) * a, a) + acc * (1.0 - a);
+    // A few small particles drifting along the wave, twinkling.
+    if (more.x > 0.0) {
+        float cw = 28.0;
+        float drift = clock * 9.0;
+        float ci = floor((d.x + drift) / cw);
+        for (int j = -1; j <= 1; j++) {
+            float id = ci + float(j);
+            float h = hash(float2(mod(id, 997.0), 1.7));
+            if (h > more.x * 0.55) continue;
+            float h2 = hash(float2(mod(id, 991.0) * 1.3, 5.1));
+            float h3 = hash(float2(mod(id, 983.0) * 0.7, 8.3));
+            float px = (id + h2) * cw - drift;
+            float py = yb + (h3 - 0.5) * 150.0;
+            float2 dv = float2(d.x - px, d.y - py) * scale;
+            float r = (0.9 + 1.0 * h3) * scale;
+            float tw = 0.35 + 0.65 * pow(0.5 + 0.5 * sin(clock * (0.6 + h2) * 2.0 + h * 30.0), 2.0);
+            float dd = dot(dv, dv);
+            float a = min((exp(-dd / (r * r)) * 0.7 + exp(-dd / (r * r * 9.0)) * 0.12) * tw * misc.w / blur, 1.0);
+            acc = float4(float3(a), a) + acc * (1.0 - a);
+        }
     }
     // Into black at the left and right edge.
     // Not a smoothstep: that stays near zero for the last stretch, so the lines would already be gone well before the edge.
-    float ex = d.x / w;
-    float edgeIn = clamp(min(ex, 1.0 - ex) / $RibbonEdgeFade, 0.0, 1.0);
-    acc *= 1.0 - pow(1.0 - edgeIn, 1.5);
+    if (more.y > 0.0) {
+        float edgeIn = clamp(min(ex, 1.0 - ex) / more.y, 0.0, 1.0);
+        acc *= 1.0 - pow(1.0 - edgeIn, 1.5);
+    }
     return half4(half3(acc.rgb), half(acc.a));
 }
 """
 
 /**
- * The wave behind a page: [style] 0 draws nothing, [WaveOriginal] the original four ribbons, [WaveRibbon] the Minima ribbon as [config] says. [soft] blurs the lines (1 = as drawn,
+ * The wave behind a page: [style] 0 draws nothing, [WaveOriginal] the original four ribbons, [WaveRibbon] the custom wave as [config] says. [soft] blurs the lines (1 = as drawn,
  * 3 = a slight blur) and [brightness] scales everything (1 = full). [pulses] sends ripples across the ribbon (not the original wave).
  */
 @Composable
-fun XmbWave(style: Int, modifier: Modifier = Modifier, config: WaveConfig = WaveConfig.Default, soft: Float = 1f, brightness: Float = 1f, pulses: WavePulses? = null) {
+fun XmbWave(
+    style: Int,
+    modifier: Modifier = Modifier,
+    config: WaveConfig = WaveConfig.Default,
+    soft: Float = 1f,
+    brightness: Float = 1f,
+    pulses: WavePulses? = null,
+    lowRes: Boolean = false,
+) {
     if (!XmbWaveEnabled || style == WaveOff) return
     val ribbon = style == WaveRibbon
     val shader = remember(ribbon) { RuntimeShader(if (ribbon) RibbonAgsl else OriginalAgsl) }
@@ -329,7 +442,7 @@ fun XmbWave(style: Int, modifier: Modifier = Modifier, config: WaveConfig = Wave
                 clock = now / 1e9f
                 if (last != 0L) {
                     val seconds = ((now - last) / 1e9f).coerceAtMost(0.25f)
-                    time += seconds * TimePerSecond * current[WaveKey.Speed] / 100f
+                    time += seconds * TimePerSecond * current[WaveKey.Speed] / 100f * (if (current[WaveKey.Reverse] > 0.5f) -1f else 1f)
                 }
                 last = now
             }
@@ -342,8 +455,9 @@ fun XmbWave(style: Int, modifier: Modifier = Modifier, config: WaveConfig = Wave
             }
         }
     }
+    Box(modifier) {
     Box(
-        modifier.drawBehind {
+        (if (lowRes) Modifier.halfResolution() else Modifier.fillMaxSize()).drawBehind {
             if (!ribbon) {
                 shader.setFloatUniform("size", size.width, size.height)
                 shader.setFloatUniform("time", clock % 6283f)
@@ -377,118 +491,30 @@ fun XmbWave(style: Int, modifier: Modifier = Modifier, config: WaveConfig = Wave
             }
             shader.setInputShader("rip", rippleShaders[rippleTurn[0]])
             shader.setFloatUniform("np", alive.toFloat())
+            shader.setFloatUniform("rib", c[WaveKey.RibbonWidth], c[WaveKey.Twist] / 100f, c[WaveKey.RibbonFill] / 100f, c[WaveKey.Threads])
+            shader.setFloatUniform("lite", c[WaveKey.Glow] / 100f, c[WaveKey.Band] / 100f, c[WaveKey.Sheen] / 100f, c[WaveKey.Focus] / 100f)
+            shader.setFloatUniform("more", c[WaveKey.Particles] / 100f, c[WaveKey.EdgeFade] / 200f, c[WaveKey.Tilt] / 100f, c[WaveKey.Background] / 100f)
+            shader.setFloatUniform("tone", c[WaveKey.RedLine], kotlin.math.abs(time) % 5000f)
             drawRect(ShaderBrush(shader))
         }
     )
-}
-
-/** How bright the Minima wave is behind the Apps page, and behind Favorites (where it is also blurred by [MinimaFavoritesSoft]). */
-const val MinimaAppsDim = 0.6f
-const val MinimaFavoritesDim = 0.5f
-const val MinimaFavoritesSoft = 4.5f
-
-/** The Minima wave starts this many seconds (at most) into its motion, so it doesn't look the same after every restart. */
-private const val MinimaStartSpread = 600f
-
-// The Minima wave, after the PS Vita home screen's wave in MinimaUI's colours: OLED black, a wide soft glow across the lower third with a pale core, and six white
-// satin sheets woven through it, one of them in MinimaUI's red. Each sheet has a glossy edge and a soft body under it; the back
-// ones are softer, fainter and slower than the front ones, and a sheen slides slowly along the band. Everything is measured on a
-// 720 px tall screen (so it looks the same at any size). [dim] darkens it all (Apps, Favorites); [soft] above 1 blurs it (Favorites).
-private val MinimaAgsl = """
-uniform float2 size;
-uniform float time;
-uniform float dim;
-uniform float soft;
-
-const float3 bgMid = float3(0.0);
-const float3 bgLow = float3(0.0);
-const float3 bgCorner = float3(0.0);
-const float3 sheetC = float3(0.949, 0.949, 0.957);
-const float3 coreC = float3(0.863, 0.863, 0.886);
-const float3 under = float3(0.290, 0.294, 0.322);
-const float3 red = float3(1.0, 0.227, 0.227);
-
-float wave(float x, float t, float k, float a) {
-    return a * (0.55 * sin(x * 2.1 + t * 0.19 + k) + 0.30 * sin(x * 3.7 - t * 0.13 + k * 1.7) + 0.15 * sin(x * 6.3 + t * 0.23 + k * 0.6));
-}
-
-half4 main(float2 p) {
-    float2 uv = p / size;
-    float ar = size.x / size.y;
-    float x = uv.x * ar;
-    float t = time;
-    float yc = 0.71 - 0.05 * uv.x + wave(x, t * 0.6, 0.0, 0.035);
-    float sx = mod(t * 0.07, ar + 1.6) - 0.8;
-    float sheen = exp(-(x - sx) * (x - sx) / 0.30);
-    float3 col = mix(float3(0.0), bgMid, smoothstep(0.0, 0.55, uv.y));
-    col = mix(col, bgLow, smoothstep(0.85, 1.0, uv.y));
-    float cx = uv.x - 1.05;
-    float cy = uv.y + 0.05;
-    col += bgCorner * exp(-(cx * cx * 2.2 + cy * cy * 6.0));
-    float dc = uv.y - yc;
-    // Black again well above and below the band.
-    col *= 1.0 - 0.6 * max(smoothstep(-0.05, -0.42, dc), smoothstep(0.12, 0.40, dc) * 0.85);
-    float g = dc < 0.0 ? exp(-dc * dc / (0.00405 * soft)) : exp(-dc * dc / (0.0198 * soft));
-    col = mix(col, under, clamp(g * 0.7, 0.0, 1.0));
-    float core = exp(-dc * dc / (0.00144 * soft * (1.0 + 0.5 * sheen))) * (0.72 + 0.22 * sin(x * 1.1 - t * 0.1) + 0.25 * sheen);
-    col = mix(col, coreC, clamp(core * 0.68, 0.0, 1.0));
-    for (int i = 0; i < 6; i++) {
-        float fi = float(i);
-        float z = fi / 5.0;
-        float off = (fi - 2.5) * 0.028;
-        float yi = yc + off * (0.7 + 0.6 * sin(x * 1.3 + fi * 1.1 + t * 0.05)) + wave(x * 1.15 + fi * 0.7, t * mix(0.62, 1.3, z), fi * 2.4, 0.03 + 0.008 * fi);
-        float d = uv.y - yi;
-        float dp = d * 720.0;
-        // Depth of field focused on the red sheet: the further a sheet is from it, the blurrier (and dimmer) its line.
-        float f = abs(z - 0.6) / 0.6;
-        float sig = mix(3.6, 38.0, f * f) * soft * soft;
-        float body = d > 0.0 ? exp(-d / ((0.035 + 0.02 * mod(fi, 3.0)) * soft)) : 0.0;
-        // A light trail: a thin bright core with a wide soft halo around it.
-        float edgeL = exp(-dp * dp / sig) * mix(0.95, 0.5, f) + exp(-dp * dp / ((260.0 + 500.0 * f) * soft * soft)) * 0.2;
-        float s = 0.5 + 0.5 * sin(x * 2.4 - t * 0.35 + fi * 1.9);
-        float a = (body * (0.07 + 0.05 * s + 0.05 * sheen) + edgeL * (0.22 + 0.45 * s * s + 0.55 * sheen)) * 0.9 / mix(1.0, soft, 0.5);
-        bool isRed = i == 3;
-        col = mix(col, isRed ? red : sheetC, clamp(a * mix(0.55, 1.0, z) * (isRed ? 1.6 : 1.0), 0.0, 1.0));
     }
-    float sd = (uv.y - (yc - 0.012)) * 720.0;
-    col = mix(col, float3(1.0), clamp(sheen * exp(-sd * sd / (30.0 * soft)) * 0.32, 0.0, 1.0));
-    col *= dim;
-    float n = fract(52.9829189 * fract(dot(p, float2(0.06711056, 0.00583715))));
-    col += (n - 0.5) / 255.0;
-    return half4(half3(clamp(col, 0.0, 1.0)), 1.0);
 }
-"""
 
 /**
- * The Minima wave behind every page. [dim] scales its brightness (1 on All Games, lower on Apps and Favorites) and [soft]
- * blurs it (1 sharp; Favorites more). Same frame pace and idle freeze as the other waves.
+ * Lays the content out at half the width and height and draws it into its own layer, which is then shown scaled up to the
+ * full size: a quarter of the pixels to shade, for a wave that is blurred anyway.
  */
-@Composable
-fun MinimaWave(dim: Float, soft: Float, modifier: Modifier = Modifier) {
-    val shader = remember { RuntimeShader(MinimaAgsl) }
-    val resting by rememberUpdatedState(LocalResting.current)
-    var time by remember { mutableFloatStateOf(kotlin.random.Random.nextFloat() * MinimaStartSpread) }
-    LaunchedEffect(Unit) {
-        var last = 0L
-        while (true) {
-            withFrameNanos { now ->
-                if (last != 0L) time += ((now - last) / 1e9f).coerceAtMost(0.25f)
-                last = now
-            }
-            delay(1000L / WaveFps - 4L)
-            if (resting) {
-                snapshotFlow { resting }.first { !it }
-                last = 0L
-            }
+private fun Modifier.halfResolution(): Modifier = layout { measurable, constraints ->
+    val width = constraints.maxWidth
+    val height = constraints.maxHeight
+    val placeable = measurable.measure(androidx.compose.ui.unit.Constraints.fixed((width + 1) / 2, (height + 1) / 2))
+    layout(width, height) {
+        placeable.placeWithLayer(0, 0) {
+            scaleX = 2f
+            scaleY = 2f
+            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+            compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
         }
     }
-    Box(
-        modifier.drawBehind {
-            shader.setFloatUniform("size", size.width, size.height)
-            shader.setFloatUniform("time", time)
-            shader.setFloatUniform("dim", dim)
-            shader.setFloatUniform("soft", soft.coerceAtLeast(1f))
-            drawRect(ShaderBrush(shader))
-        }
-    )
 }

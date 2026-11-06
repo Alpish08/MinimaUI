@@ -20,10 +20,7 @@ class Settings(platforms: List<Platform>, private val store: LibraryStore) {
     var shuffleMusic by mutableStateOf(store.loadFlag(KEY_SHUFFLE_MUSIC, false))
         private set
 
-    /**
-     * The animated wave behind the pages: 0 off, 1 the original wave (ORIGINAL), 2 the Minima ribbon (CUSTOM, see [WaveConfig]),
-     * 3 the Minima wave (MINIMA).
-     */
+    /** The animated wave behind the pages: 0 off, 1 the original wave (ORIGINAL), 2 the custom wave (CUSTOM, see [WaveConfig]). */
     var waveStyle by mutableIntStateOf(loadWaveStyle())
         private set
 
@@ -167,7 +164,7 @@ class Settings(platforms: List<Platform>, private val store: LibraryStore) {
     private fun loadWaveStyle(): Int =
         store.loadString(KEY_WAVE_STYLE)?.toIntOrNull()?.takeIf { it in 0 until WaveStyleCount } ?: if (store.loadFlag(KEY_XMB_WAVE, false)) 1 else 2
 
-    /** OFF -> ORIGINAL (the original wave) -> CUSTOM (the Minima ribbon) -> MINIMA -> OFF. A fresh install starts on CUSTOM. */
+    /** OFF -> ORIGINAL (the original wave) -> CUSTOM (the custom wave) -> OFF. A fresh install starts on CUSTOM (an old MINIMA reads as CUSTOM). */
     fun cycleWaveStyle() {
         waveStyle = (waveStyle + 1) % WaveStyleCount
         store.saveString(KEY_WAVE_STYLE, waveStyle.toString())
@@ -184,7 +181,25 @@ class Settings(platforms: List<Platform>, private val store: LibraryStore) {
         }
     }
 
-    /** Rolls a new Minima ribbon look (and shows it: the wave switches to the ribbon). */
+    /**
+     * How blurred and how dimmed (0..100 % each) the custom wave is behind the Apps page. All Games shows it as it is, and
+     * Favorites never has it behind.
+     */
+    var waveAppsBlur by mutableIntStateOf(loadAppsWave(0, DefaultAppsBlur))
+        private set
+    var waveAppsDim by mutableIntStateOf(loadAppsWave(1, DefaultAppsDim))
+        private set
+
+    fun setWaveApps(blur: Int, dim: Int) {
+        waveAppsBlur = blur.coerceIn(0, 100)
+        waveAppsDim = dim.coerceIn(0, 100)
+        store.saveString(KEY_WAVE_APPS, "$waveAppsBlur,$waveAppsDim")
+    }
+
+    private fun loadAppsWave(index: Int, default: Int): Int =
+        store.loadString(KEY_WAVE_APPS)?.split(",")?.getOrNull(index)?.trim()?.toIntOrNull()?.coerceIn(0, 100) ?: default
+
+    /** Rolls a new custom wave look (and shows it: the wave switches to CUSTOM). */
     fun randomizeWave() = applyWave(wave.randomized())
 
     fun toggleMenuSounds() {
@@ -207,7 +222,10 @@ class Settings(platforms: List<Platform>, private val store: LibraryStore) {
         private const val KEY_XMB_WAVE = "xmbWave"
         private const val KEY_WAVE = "waveConfig"
         private const val WaveRibbonStyle = 2
-        private const val WaveStyleCount = 4
+        private const val WaveStyleCount = 3
+        private const val KEY_WAVE_APPS = "waveApps"
+        private const val DefaultAppsBlur = 40
+        private const val DefaultAppsDim = 35
         private const val KEY_WAVE_STYLE = "waveStyle"
         private const val KEY_TOUCH_GESTURES = "touchGestures"
         private const val KEY_UI_FPS = "uiFps"

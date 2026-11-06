@@ -308,6 +308,8 @@ fun MenuOverlay(
     onSeekVolume: (Int) -> Unit = {},
     onStepList: (delta: Int) -> Unit = {},
     onSeekList: (fraction: Float) -> Unit = {},
+    customizing: Boolean = false,
+    customize: WaveCustomize = WaveCustomize(),
 ) {
     val density = androidx.compose.ui.platform.LocalDensity.current.density
     val panelShape = RoundedCornerShape(Dimens.PanelCorner)
@@ -346,16 +348,32 @@ fun MenuOverlay(
         entriesFade.animateTo(1f, tween(EntriesFadeInMillis))
     }
 
+    // Going into the wave's Customize screen (and back out, the same steps backwards): the entries fade out as they do between
+    // categories, the categories fade, the sub-box slides over to the left, the preview comes in on the right and the sliders
+    // fade in once the box is there. One clock runs it all; each part takes its own stretch of it (see EditPhases).
+    val edit = remember { Animatable(if (customizing) 1f else 0f) }
+    androidx.compose.runtime.LaunchedEffect(customizing) {
+        edit.animateTo(if (customizing) 1f else 0f, tween(EditMillis, easing = androidx.compose.animation.core.LinearEasing))
+    }
+    val editShown by remember { androidx.compose.runtime.derivedStateOf { edit.value > 0f } }
+    val subBoxX = { SubBox.x + (EditBoxX - SubBox.x) * EaseInOut.transform(editPhase(edit.value, EditSlide)) }
+
     Box(
         modifier = modifier
             .fillMaxSize()
             // Touch: tap a category, an entry or a page dot, or outside the panel to close the menu.
-            .pointerInput(category, page, entries.size, folderScroll) {
+            .pointerInput(category, page, entries.size, folderScroll, customizing) {
                 detectTapGestures { offset ->
                     val x = offset.x / density - Dimens.PanelX.value
                     val y = offset.y / density - Dimens.PanelY.value
                     if (x < 0f || y < 0f || x > Dimens.PanelWidth.value || y > Dimens.PanelHeight.value) {
-                        onTapOutside()
+                        if (customizing) customize.onClose() else onTapOutside()
+                        return@detectTapGestures
+                    }
+                    // In Customize only the sliders take taps (on their bars); a tap on a card selects it.
+                    if (customizing) {
+                        (0..1).firstOrNull { i -> editCardRect(i).let { x >= it.x && x <= it.x + it.width && y >= it.y && y <= it.y + it.height } }
+                            ?.let { customize.onSelect(it) }
                         return@detectTapGestures
                     }
                     fun UiRect.contains() = x >= this.x && x <= this.x + width && y >= this.y && y <= this.y + height
@@ -377,10 +395,10 @@ fun MenuOverlay(
                 }
             }
             // Touch: drag up or down to scroll a long list (the ROM folders).
-            .then(if (layout.scrolls) Modifier.verticalDragSteps(95f, onStepList) else Modifier)
+            .then(if (layout.scrolls && !customizing) Modifier.verticalDragSteps(95f, onStepList) else Modifier)
             // Touch: drag sideways to turn the pages; they follow the finger and settle on release.
-            .pointerInput(category, page) {
-                if (pages <= 1) return@pointerInput
+            .pointerInput(category, page, customizing) {
+                if (pages <= 1 || customizing) return@pointerInput
                 val width = SubBox.width * density
                 var start = 0f
                 detectHorizontalDragGestures(
@@ -413,16 +431,8 @@ fun MenuOverlay(
                 .background(MenuPanelFill)
                 .backgroundOutline(depth = 24.dp, corner = Dimens.PanelCorner)
         ) {
-            // The darker box the sub-settings sit in.
-            Box(
-                modifier = Modifier
-                    .offset(SubBox.x.dp, SubBox.y.dp)
-                    .size(SubBox.width.dp, SubBox.height.dp)
-                    .clip(subBoxShape)
-                    .background(SubBoxFill)
-                    .backgroundOutline(depth = 22.dp, corner = SubBoxCorner.dp)
-            )
-
+            // The categories (they fade out while Customize is open).
+            Box(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - editPhase(edit.value, EditCategoriesOut) }) {
             // Only the part of the menu being navigated glows; the category left behind keeps just its white border.
             SelectionGlow(if (focus == MenuFocus.Categories) categoryRect(category.ordinal).grown(CategoryGrow).toGlow() else null)
 
@@ -447,9 +457,20 @@ fun MenuOverlay(
                 fadeDepth = outlineDepthFor(categoryRect(category.ordinal).height),
                 underStrength = UnfocusedOutline
             )
+            }
+
+            // The darker box the sub-settings sit in. Drawn over the categories, so it slides over them as they fade (Customize).
+            Box(
+                modifier = Modifier
+                    .offset { IntOffset((subBoxX() * density).roundToInt(), (SubBox.y * density).roundToInt()) }
+                    .size(SubBox.width.dp, SubBox.height.dp)
+                    .clip(subBoxShape)
+                    .background(SubBoxFill)
+                    .backgroundOutline(depth = 22.dp, corner = SubBoxCorner.dp)
+            )
 
             // The pages, side by side in the sub-box; each has its own glow, pills and focus ring, and slides with the others.
-            Box(Modifier.fillMaxSize().graphicsLayer { alpha = entriesFade.value }) {
+            Box(Modifier.fillMaxSize().graphicsLayer { alpha = entriesFade.value * (1f - editPhase(edit.value, EditEntriesOut)) }) {
             val shownPages = lastShown.pages.size
             val shownPage = if (settled) page else lastShown.page
             for (p in 0 until shownPages) {
@@ -459,7 +480,7 @@ fun MenuOverlay(
                 // The box stays put and clips; the page slides inside it (so it never leaves the darker sub-box).
                 Box(
                     modifier = Modifier
-                        .offset(SubBox.x.dp, SubBox.y.dp)
+                        .offset { IntOffset((subBoxX() * density).roundToInt(), (SubBox.y * density).roundToInt()) }
                         .size(SubBox.width.dp, SubBox.height.dp)
                         .clip(subBoxShape)
                 ) {
@@ -493,7 +514,7 @@ fun MenuOverlay(
                     contentAlignment = Alignment.Center
                 ) {
                     PageDots(
-                        modifier = Modifier.graphicsLayer { alpha = entriesFade.value },
+                        modifier = Modifier.graphicsLayer { alpha = entriesFade.value * (1f - editPhase(edit.value, EditEntriesOut)) },
                         count = pages,
                         current = page,
                         vertical = false,
@@ -503,6 +524,8 @@ fun MenuOverlay(
                     )
                 }
             }
+
+            if (customizing || editShown) CustomizeContent(customize, progress = { edit.value })
         }
 
         // On the screen's bottom right, where the page hints normally are, not inside the panel.
@@ -760,6 +783,107 @@ private fun SliderCard(title: String, value: Int, active: Boolean, rect: UiRect,
                         .background(Color.White, CircleShape)
                 )
             }
+        }
+    }
+}
+
+// ---- The custom wave's Customize screen, drawn by the menu itself so its sub-box can slide over ----
+
+/**
+ * What the Customize screen shows and where its touches go: the selected slider ([selected] 0 blur, 1 dim), their values
+ * (0..100 %), the wave for the preview box and the callbacks.
+ */
+class WaveCustomize(
+    val selected: Int = 0,
+    val blur: Int = 0,
+    val dim: Int = 0,
+    val preview: @Composable (Modifier) -> Unit = {},
+    val onSeek: (index: Int, percent: Int) -> Unit = { _, _ -> },
+    val onSelect: (index: Int) -> Unit = {},
+    val onClose: () -> Unit = {},
+)
+
+/** How long going into Customize takes, and the stretch of it (start, end; 0..1) each part moves in. */
+private const val EditMillis = 640
+private val EditEntriesOut = 0f to 0.15f
+private val EditCategoriesOut = 0f to 0.45f
+private val EditSlide = 0.05f to 0.72f
+private val EditPreviewIn = 0.42f to 1f
+private val EditListIn = 0.72f to 0.95f
+
+private fun editPhase(t: Float, span: Pair<Float, Float>): Float = ((t - span.first) / (span.second - span.first)).coerceIn(0f, 1f)
+
+// The sub-box mirrored to the panel's left side (the same margin as on the right), its two slider cards, and the preview in the right half.
+private const val EditBoxX = 50f
+private const val EditCardW = 700f
+private const val EditCardH = 150f
+private const val EditCardPitch = 232f
+private const val EditPreviewW = 600f
+private const val EditPreviewH = 338f
+private const val EditPreviewCorner = 34f
+private const val EditPreviewX = EditBoxX + 926f + (1694f - EditBoxX - 926f - EditPreviewW) / 2f
+private const val EditPreviewY = 259f
+
+private fun editCardRect(index: Int) = UiRect(
+    EditBoxX + SubBox.width / 2f - EditCardW / 2f,
+    SubBox.y + SubBox.height / 2f - (EditCardPitch + EditCardH) / 2f + index * EditCardPitch,
+    EditCardW,
+    EditCardH
+)
+
+@Composable
+private fun CustomizeContent(customize: WaveCustomize, progress: () -> Float) {
+    // The sliders: in once the box has arrived, out first on the way back.
+    Box(Modifier.fillMaxSize().graphicsLayer { alpha = editPhase(progress(), EditListIn) }) {
+        val grow = ListGrow
+        SelectionGlow(editCardRect(customize.selected).grown(grow).toGlow(60f))
+        for (i in 0..1) {
+            val growW by animateFloatAsState(listGrowth((i - customize.selected).toFloat(), grow, SettingsNeighbor), tween(200), label = "editGrow")
+            SliderCard(
+                title = if (i == 0) "Blur" else "Dim",
+                value = if (i == 0) customize.blur else customize.dim,
+                active = i == customize.selected,
+                rect = editCardRect(i).grown(growW),
+                onSeek = { customize.onSeek(i, it) }
+            )
+        }
+        FocusRing(
+            editCardRect(customize.selected).grown(grow).toGlow(60f),
+            fadeDepth = outlineDepthFor(EditCardH),
+            underStrength = UnfocusedOutline
+        )
+    }
+    // The preview: it rises into place from a little to the right, growing slightly as it fades in.
+    Box(
+        Modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                val p = EaseInOut.transform(editPhase(progress(), EditPreviewIn))
+                alpha = p
+                translationX = (1f - p) * 60f * density
+                val s = 0.94f + 0.06f * p
+                scaleX = s
+                scaleY = s
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(
+                    (EditPreviewX + EditPreviewW / 2f) / 1694f, (EditPreviewY + EditPreviewH / 2f) / 844f
+                )
+            }
+    ) {
+        Box(
+            Modifier.offset(EditPreviewX.dp, (EditPreviewY - 78f).dp).size(EditPreviewW.dp, 50.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Preview", color = Color(0xFFA8A8AE), fontWeight = FontWeight.Bold, fontSize = 30.sp, maxLines = 1)
+        }
+        Box(
+            Modifier
+                .offset(EditPreviewX.dp, EditPreviewY.dp)
+                .size(EditPreviewW.dp, EditPreviewH.dp)
+                .clip(RoundedCornerShape(EditPreviewCorner.dp))
+                .background(Color.Black)
+                .backgroundOutline(depth = 18.dp, corner = EditPreviewCorner.dp)
+        ) {
+            customize.preview(Modifier.fillMaxSize().clip(RoundedCornerShape(EditPreviewCorner.dp)))
         }
     }
 }

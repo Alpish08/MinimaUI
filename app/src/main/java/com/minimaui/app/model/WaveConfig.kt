@@ -10,34 +10,62 @@ enum class WaveFadeTarget(val key: String) {
 }
 
 /**
- * One value of the wave: its [key] in the text form, the range and [step], the [default], and the range Randomize draws
- * from ([randMin]..[randMax]). Values in px are in a 960 x 540 design space.
+ * One value of the wave: its [key] in the text form, the range and [step], the [default], and how Randomize picks it: a value
+ * anywhere in [randMin]..[randMax], or, for an effect, only one time in [randOn] (otherwise it is off, at 0). Values in px are
+ * in a 960 x 540 design space.
  */
 enum class WaveKey(
     val key: String,
     val min: Float, val max: Float, val step: Float, val default: Float,
     val randMin: Float, val randMax: Float,
+    val randOn: Float = 1f,
 ) {
-    RedOpacity("rop", 0f, 100f, 1f, 100f, 62f, 80f),
-    RedFade("fade", 0f, 100f, 1f, 69f, 12f, 34f),
-    RedFadeDepth("depth", 20f, 500f, 10f, 330f, 130f, 260f),
-    RedFadeFalloff("soft", 0.5f, 8f, 0.1f, 5.0f, 1.9f, 3.4f),
-    WhiteFade("wfade", 0f, 100f, 1f, 45f, 8f, 32f),
-    WhiteFadeDepth("wdepth", 10f, 400f, 10f, 40f, 40f, 140f),
-    WhiteFadeFalloff("wsoft", 0.5f, 8f, 0.1f, 2.2f, 1.3f, 2.6f),
+    RedOpacity("rop", 0f, 100f, 1f, 100f, 70f, 100f),
+    RedFade("fade", 0f, 100f, 1f, 69f, 0f, 70f),
+    RedFadeDepth("depth", 20f, 500f, 10f, 330f, 60f, 300f),
+    RedFadeFalloff("soft", 0.5f, 8f, 0.1f, 5.0f, 1.2f, 4f),
+    WhiteFade("wfade", 0f, 100f, 1f, 45f, 0f, 70f),
+    WhiteFadeDepth("wdepth", 10f, 400f, 10f, 40f, 30f, 200f),
+    WhiteFadeFalloff("wsoft", 0.5f, 8f, 0.1f, 2.2f, 1.2f, 4f),
     Dither("dither", 0f, 10f, 1f, 3f, 3f, 3f),
-    Speed("speed", 0f, 200f, 5f, 75f, 40f, 90f),
-    Randomness("rand", 0f, 100f, 5f, 100f, 20f, 60f),
+    Speed("speed", 0f, 200f, 5f, 75f, 15f, 140f),
+    Randomness("rand", 0f, 100f, 5f, 100f, 30f, 90f),
     Lines("lines", 1f, 10f, 1f, 1f, 1f, 7f),
-    Spread("spread", 0f, 60f, 1f, 20f, 4f, 10f),
-    Amplitude("amp", 0f, 150f, 1f, 40f, 32f, 65f),
-    Wavelength("freq", 30f, 300f, 5f, 100f, 120f, 210f),
-    Height("height", 20f, 95f, 1f, 65f, 48f, 62f),
-    WhiteOpacity("wop", 0f, 100f, 1f, 50f, 18f, 40f),
-    RedWidth("rw", 0.5f, 6f, 0.1f, 1.0f, 1.8f, 4.4f),
-    WhiteWidth("ww", 0.5f, 6f, 0.1f, 1.0f, 1.2f, 2.6f),
+    Spread("spread", 0f, 60f, 1f, 20f, 0f, 40f),
+    Amplitude("amp", 0f, 150f, 1f, 40f, 5f, 85f),
+    Wavelength("freq", 30f, 300f, 5f, 100f, 110f, 240f),
+    Height("height", 20f, 95f, 1f, 65f, 45f, 80f),
+    WhiteOpacity("wop", 0f, 100f, 1f, 50f, 25f, 55f),
+    RedWidth("rw", 0.5f, 6f, 0.1f, 1.0f, 1.2f, 3.2f),
+    WhiteWidth("ww", 0.5f, 6f, 0.1f, 1.0f, 0.8f, 2.4f),
     // How soft the lines are (a bell curve this many design px wide around each, red one too).
-    Blur("blur", 0f, 20f, 1f, 1f, 1f, 4f);
+    Blur("blur", 0f, 20f, 1f, 1f, 0f, 3f),
+
+    // The sheets and their light. Every default leaves the look exactly as it was before these existed (an old wave file reads the same).
+    // A line can be a ribbon: a second edge this many design px below it, the band between them filled, with threads in between.
+    RibbonWidth("rwide", 0f, 60f, 1f, 0f, 0f, 60f),
+    // How much the ribbon's width swings, through zero (where the ribbon twists over and its edges bunch up), 0..100%.
+    Twist("twist", 0f, 100f, 1f, 0f, 0f, 100f),
+    RibbonFill("rfill", 0f, 100f, 1f, 0f, 0f, 50f),
+    Threads("threads", 0f, 3f, 1f, 0f, 0f, 3f),
+    // A soft halo around every line (light trails).
+    Glow("glow", 0f, 100f, 1f, 0f, 0f, 60f),
+    // Depth of field: lines further from the red one get blurrier and dimmer.
+    Focus("dof", 0f, 100f, 1f, 0f, 0f, 60f, randOn = 0.5f),
+    // A wide glow with a pale core along the middle of the wave.
+    Band("band", 0f, 100f, 1f, 0f, 0f, 70f),
+    // A highlight that slides slowly along the lines.
+    Sheen("sheen", 0f, 100f, 1f, 0f, 0f, 100f),
+    Particles("dust", 0f, 100f, 1f, 0f, 10f, 70f, randOn = 0.45f),
+    // How far in from the left and right edge everything fades into black, in % of half the width; 0 = no fade. Always the default.
+    EdgeFade("edge", 0f, 100f, 1f, 45f, 45f, 45f),
+    // The whole wave rises toward one side (-100..100).
+    Tilt("tilt", -100f, 100f, 5f, 0f, -35f, 15f),
+    // A dark graphite gradient behind the wave instead of pure black.
+    Background("bglift", 0f, 100f, 1f, 0f, 0f, 50f),
+    // 1 draws the middle line in MinimaUI's red (0 in white too; always on); 1 makes the wave travel the other way.
+    RedLine("red", 0f, 1f, 1f, 1f, 1f, 1f),
+    Reverse("reverse", 0f, 1f, 1f, 0f, 0f, 1f);
 
     /** [v] snapped to this slider's step and kept in range. */
     fun snap(v: Float): Float {
@@ -61,27 +89,36 @@ class WaveConfig(val values: FloatArray, val target: WaveFadeTarget, val seeds: 
     val lineCount get() = this[WaveKey.Lines].toInt() + 1 // the white lines and the red one
 
     /**
-     * A new random look: every value drawn from its [WaveKey.randMin]..[WaveKey.randMax], which are kept around a look that
-     * works. Two things depend on how many lines there are, so a crowd never turns into a mess: a few lines can spread
-     * well apart and be brighter, many sit close together and fainter. The white fades mostly cover all the white lines.
+     * A new random look, nothing kept from this one: every value is drawn evenly, on its own, from a range that keeps the
+     * wave looking right ([WaveKey.randMin]..[WaveKey.randMax]; depth of field and particles only come with some looks, see
+     * [WaveKey.randOn]), with new seeds and a random fade target. The edge fade and the red line always stay as built in.
+     * The lines are only kept close enough together that all of them fit on the screen.
      */
     fun randomized(random: Random = Random.Default): WaveConfig {
         fun draw(lo: Float, hi: Float) = lo + random.nextFloat() * (hi - lo)
-        val lines = kotlin.math.floor(draw(WaveKey.Lines.randMin, WaveKey.Lines.randMax + 1f)).coerceAtMost(WaveKey.Lines.randMax) // 1..7, each as likely
-        val few = lines <= 2f
         val values = FloatArray(WaveKey.entries.size) {
             val key = WaveKey.entries[it]
-            val v = when (key) {
-                WaveKey.Lines -> lines
-                WaveKey.Spread -> if (few) draw(8f, 26f) else draw(key.randMin, key.randMax)
-                WaveKey.WhiteOpacity -> draw(key.randMin, (key.randMax - (lines - 1f) * 2f).coerceAtLeast(key.randMin + 4f))
+            val v = when {
+                key.randOn < 1f && random.nextFloat() >= key.randOn -> 0f
+                // Whole steps (lines, threads, the switches) each as likely as the others.
+                key.step >= 1f && key.max - key.min <= 10f -> kotlin.math.floor(draw(key.randMin, key.randMax + 1f)).coerceAtMost(key.randMax)
                 else -> draw(key.randMin, key.randMax)
             }
             key.snap(v)
         }
-        val target = if (random.nextFloat() < 0.6f) WaveFadeTarget.All else WaveFadeTarget.entries.random(random)
-        return WaveConfig(values, target, newSeeds(random))
+        val lines = values[WaveKey.Lines.ordinal]
+        values[WaveKey.Spread.ordinal] = WaveKey.Spread.snap(values[WaveKey.Spread.ordinal].coerceAtMost(260f / lines))
+        return WaveConfig(values, WaveFadeTarget.entries.random(random), newSeeds(random))
     }
+
+    /** This look with [key] set to [value] (snapped to its step and range). */
+    fun with(key: WaveKey, value: Float): WaveConfig = WaveConfig(values.copyOf().also { it[key.ordinal] = key.snap(value) }, target, seeds)
+
+    /** This look with the white fades on [target]. */
+    fun with(target: WaveFadeTarget): WaveConfig = WaveConfig(values, target, seeds)
+
+    /** True if [other] is the same look (every value, the fade target and the seeds). */
+    fun sameAs(other: WaveConfig): Boolean = values.contentEquals(other.values) && target == other.target && seeds.contentEquals(other.seeds)
 
     /** The block of `key = value` lines (and the seeds) that [parse] reads back. */
     fun toText(): String = buildString {

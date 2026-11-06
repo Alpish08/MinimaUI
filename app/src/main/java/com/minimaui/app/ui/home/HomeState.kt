@@ -17,7 +17,6 @@ import com.minimaui.app.model.AppLibrary
 import com.minimaui.app.data.InstalledApp
 import com.minimaui.app.ui.components.WaveOriginal
 import com.minimaui.app.ui.components.WaveRibbon
-import com.minimaui.app.ui.components.WaveMinima
 import com.minimaui.app.ui.menu.PickerColumns
 import com.minimaui.app.model.GameEntry
 import com.minimaui.app.model.Library
@@ -112,6 +111,7 @@ class HomeState(
         get() = listOf(
             screen, selectedPlatformIndex, gameIndex, favoritesNav.page, favoritesNav.slot, appsNav.page, appsNav.slot,
             menuOpen, menuFocus, menuCategory, menuPage, menuAction, pickerIndex, searchIndex, searchOnResults, searchKey, held, settings.volume,
+            waveEditOpen, waveEditIndex, settings.wave.values.contentHashCode(), settings.waveAppsBlur, settings.waveAppsDim,
             moreOpen, moreIndex, folderPickerOpen, folderIndex,
         ).hashCode()
 
@@ -194,6 +194,12 @@ class HomeState(
         private set
     /** The page of the open menu category (Customization has three). */
     var menuPage by mutableIntStateOf(0)
+        private set
+
+    /** The custom wave's Customize screen (the menu's sub-box slides over to hold it): open, and its slider (0 blur, 1 dim). */
+    val waveEditOpen: Boolean get() = menuOpen && waveEditShown
+    private var waveEditShown by mutableStateOf(false)
+    var waveEditIndex by mutableIntStateOf(0)
         private set
     private var menuContext by mutableStateOf(MenuContext.Favorites)
     private var menuGame by mutableStateOf<GameEntry?>(null)
@@ -902,7 +908,7 @@ class HomeState(
                         ControlHint("Y", "Rescan") + base
                 MenuCategory.Customize ->
                     if (menuPage == 0 && menuAction == WaveRow) when (settings.waveStyle) {
-                        WaveRibbon -> listOf(ControlHint("X", "Randomize"), ControlHint("Y", "Save Current")) + base
+                        WaveRibbon -> listOf(ControlHint("X", "Customize")) + base
                         else -> base
                     }
                     else base
@@ -926,7 +932,7 @@ class HomeState(
         }
     }
 
-    private fun waveLabel(style: Int) = when (style) { WaveOriginal -> "ORIGINAL"; WaveRibbon -> "CUSTOM"; WaveMinima -> "MINIMA"; else -> "OFF" }
+    private fun waveLabel(style: Int) = when (style) { WaveOriginal -> "ORIGINAL"; WaveRibbon -> "CUSTOM"; else -> "OFF" }
 
     private fun onOff(value: Boolean) = if (value) "ON" else "OFF"
 
@@ -1086,7 +1092,7 @@ class HomeState(
             isEditingTitle -> cancelTitleEdit()
             folderPickerOpen -> folderPickerOpen = false
             moreOpen -> moreOpen = false
-            menuOpen -> if (menuFocus == MenuFocus.Actions) menuFocus = MenuFocus.Categories else menuOpen = false
+            menuOpen -> if (waveEditOpen) closeWaveEdit() else if (menuFocus == MenuFocus.Actions) menuFocus = MenuFocus.Categories else menuOpen = false
             held -> held = false
             editMode -> changeEditMode(false)
             favView != FavView.Favorites -> leaveView()
@@ -1199,6 +1205,8 @@ class HomeState(
 
     private fun toggleMenu() {
         menuOpen = !menuOpen
+        // The menu always opens on its own page, never still on the wave's Customize screen.
+        waveEditShown = false
         if (!menuOpen) return
         held = false
         menuContext = when (screen) {
@@ -1609,6 +1617,7 @@ class HomeState(
     }
 
     private fun onMenuKey(key: Key, isRepeat: Boolean): Boolean {
+        if (waveEditOpen) return onWaveEditKey(key, isRepeat)
         val inCategories = menuFocus == MenuFocus.Categories
         val onVolume = !inCategories && menuCategory == MenuCategory.Customize && menuPage == AudioPage && menuAction == AudioVolumeIndex
         when (key) {
@@ -1637,7 +1646,6 @@ class HomeState(
             Key.ButtonY ->
                 if (!isRepeat && !inCategories) {
                     if (menuCategory == MenuCategory.RomFolders) actions.rescan()
-                    else if (menuCategory == MenuCategory.Customize && menuPage == 0 && menuAction == WaveRow && settings.waveStyle == WaveRibbon) actions.saveWave()
                 }
             Key.ButtonL1 -> if (!isRepeat) changeMenuPage(-1)
             Key.ButtonR1 -> if (!isRepeat) changeMenuPage(1)
@@ -1645,6 +1653,49 @@ class HomeState(
             else -> return false
         }
         return true
+    }
+
+    // ---- The custom wave's Customize screen ----
+
+    private fun openWaveEdit() {
+        waveEditShown = true
+        waveEditIndex = 0
+    }
+
+    fun closeWaveEdit() {
+        waveEditShown = false
+    }
+
+    val waveEditHints: List<ControlHint>
+        get() = listOf(ControlHint("X", "Randomize"), ControlHint("Y", "Save Current"), ControlHint("B", "Back"))
+
+    private fun onWaveEditKey(key: Key, isRepeat: Boolean): Boolean {
+        when (key) {
+            Key.DirectionUp -> waveEditIndex = 0
+            Key.DirectionDown -> waveEditIndex = 1
+            Key.DirectionLeft -> stepWaveEdit(-1)
+            Key.DirectionRight -> stepWaveEdit(1)
+            Key.ButtonX -> if (!isRepeat) settings.randomizeWave()
+            Key.ButtonY -> if (!isRepeat) actions.saveWave()
+            Key.ButtonB, Key.Escape -> if (!isRepeat) closeWaveEdit()
+            // The other buttons do nothing here (and never reach the menu under it).
+            else -> return false
+        }
+        return true
+    }
+
+    /** Left (-1) or right (+1): the selected slider a couple of percent down or up. */
+    private fun stepWaveEdit(delta: Int) {
+        val step = delta * WaveSliderStep
+        if (waveEditIndex == 0) settings.setWaveApps(settings.waveAppsBlur + step, settings.waveAppsDim)
+        else settings.setWaveApps(settings.waveAppsBlur, settings.waveAppsDim + step)
+    }
+
+    /** A tap or drag on slider [index] (0 blur, 1 dim) at [fraction] of its width. */
+    fun touchWaveSeek(index: Int, fraction: Float) {
+        waveEditIndex = index.coerceIn(0, 1)
+        val value = (kotlin.math.round(fraction.coerceIn(0f, 1f) * 100f / WaveSliderStep) * WaveSliderStep).toInt()
+        if (waveEditIndex == 0) settings.setWaveApps(value, settings.waveAppsDim) else settings.setWaveApps(settings.waveAppsBlur, value)
     }
 
     /** Moves the highlighted entry one step; false if there is nowhere to go that way. */
@@ -1760,7 +1811,7 @@ class HomeState(
     /** The X button: removes the selected ROM folder from the list. */
     private fun performSecondaryAction() {
         when (menuCategory) {
-            MenuCategory.Customize -> if (menuPage == 0 && menuAction == WaveRow && settings.waveStyle == WaveRibbon) settings.randomizeWave()
+            MenuCategory.Customize -> if (menuPage == 0 && menuAction == WaveRow && settings.waveStyle == WaveRibbon) openWaveEdit()
             MenuCategory.EditGame -> if (menuPage == 0) removeEditItem(editItems.getOrNull(menuAction))
             MenuCategory.RomFolders -> {
                 settings.removeRomFolder(menuAction)
@@ -2079,3 +2130,6 @@ class HomeState(
             )
     }
 }
+
+/** How far one press moves a slider of the wave's Customize screen, in %. */
+private const val WaveSliderStep = 2
