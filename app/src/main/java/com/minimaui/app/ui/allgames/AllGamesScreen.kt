@@ -863,11 +863,8 @@ private fun GameColumn(
             // With the ribbon wave behind the page, the unfocused covers sit on soft dark backdrops as the Apps page's icons do,
             // so the wave's lines don't run through them; all of them first, so none is drawn over a neighbouring cover.
             if (backdrop) {
-                for (i in visibleRows) {
-                    if (games.getOrNull(i) != null || (showPlus && i == games.size)) {
-                        key("backdrop", games.getOrNull(i)?.id ?: "plus") { CoverBackdrop(index = i, position = listPosition, columnAlpha = columnAlpha) }
-                    }
-                }
+                val last = if (showPlus) games.size else games.size - 1
+                CoverBackdrops(rows = visibleRows.first..minOf(visibleRows.last, last), position = listPosition, columnAlpha = columnAlpha)
             }
             for (i in visibleRows) {
                 val game = games.getOrNull(i)
@@ -893,29 +890,30 @@ private fun GameColumn(
 private const val CoverBackdropReach = 360f / 212f
 
 /**
- * The soft dark backdrop behind an unfocused cover (the same as the Apps page's behind its icons, stretched to the cover's
- * shape): 30% black under the cover, fading out to [CoverBackdropReach] times its size. It fades out as the cover reaches the
- * focus (which has its glow instead) and with the cover at the ends of the list.
+ * The soft dark backdrops behind the unfocused covers in [rows] (the same as the Apps page's behind its icons, stretched to a
+ * cover's shape): 30% black under a cover, fading out to [CoverBackdropReach] times its size. Each fades out as its cover
+ * reaches the focus (which has its glow instead) and with the cover at the ends of the list. All drawn by one node, in its
+ * own layer, so they cost no composition and only redraw while the list moves.
  */
 @Composable
-private fun CoverBackdrop(index: Int, position: State<Float>, columnAlpha: () -> Float) {
-    val slideIndex by animateFloatAsState(index.toFloat(), tween(260, easing = EaseInOut), label = "coverBackdropIndex")
+private fun CoverBackdrops(rows: IntRange, position: State<Float>, columnAlpha: () -> Float) {
     Box(
         Modifier
             .fillMaxSize()
-            .graphicsLayer {
-                val distance = slideIndex - position.value
-                alpha = (abs(distance)).coerceIn(0f, 1f) * slotOpacity(slotValue(SlotAlpha, distance)) * columnAlpha()
-            }
+            .graphicsLayer { alpha = columnAlpha() }
             .drawBehind {
-                val distance = slideIndex - position.value
-                val width = (CoverWidth * slotValue(SlotScale, distance) * CoverBackdropReach).dp.toPx()
-                val height = width * CoverAspect
-                val center = Offset(ListCenterX.dp.toPx(), slotValue(SlotCenterY, distance).dp.toPx())
-                val radius = width / 2f
-                // A round gradient squashed to the cover's proportions.
-                scale(1f, height / width, center) {
-                    drawCircle(CoverBackdropBrush(center, radius), radius, center)
+                for (i in rows) {
+                    val distance = i - position.value
+                    val alpha = abs(distance).coerceIn(0f, 1f) * slotOpacity(slotValue(SlotAlpha, distance))
+                    if (alpha <= 0.005f) continue
+                    val width = (CoverWidth * slotValue(SlotScale, distance) * CoverBackdropReach).dp.toPx()
+                    val height = width * CoverAspect
+                    val center = Offset(ListCenterX.dp.toPx(), slotValue(SlotCenterY, distance).dp.toPx())
+                    val radius = width / 2f
+                    // A round gradient squashed to the cover's proportions.
+                    scale(1f, height / width, center) {
+                        drawCircle(CoverBackdropBrush(center, radius), radius, center, alpha = alpha)
+                    }
                 }
             }
     )

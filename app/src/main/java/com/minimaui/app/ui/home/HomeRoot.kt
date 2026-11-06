@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import com.minimaui.app.ui.components.BootLogo
 import com.minimaui.app.ui.components.BootVideo
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import com.minimaui.app.ui.favorites.Direction
@@ -512,18 +513,21 @@ fun HomeRoot(
                     HomePage.Favorites -> WavePage.Favorites
                 }
             )
-            val ribbonLevel by animateFloatAsState(if (state.waveEditOpen) 0f else pageLook.brightness / 100f, tween(350), label = "ribbonLevel")
-            val ribbonSoft by animateFloatAsState(1f + pageLook.blur / 100f * WaveMaxBlur, tween(350), label = "ribbonSoft")
-            if (ribbon && ribbonLevel > 0.001f) {
+            // Read only by the wave's draw (and the two switches below), so fading between pages' looks doesn't recompose the pages.
+            val ribbonLevel = animateFloatAsState(if (state.waveEditOpen) 0f else pageLook.brightness / 100f, tween(350), label = "ribbonLevel")
+            val ribbonSoft = animateFloatAsState(1f + pageLook.blur / 100f * WaveMaxBlur, tween(350), label = "ribbonSoft")
+            val ribbonShown by remember { derivedStateOf { ribbonLevel.value > 0.001f } }
+            // Blurred well enough that half the resolution doesn't show.
+            val ribbonLowRes by remember { derivedStateOf { ribbonSoft.value >= 2f } }
+            if (ribbon && ribbonShown) {
                 XmbWave(
                     style = WaveRibbon,
                     config = settings.wave,
-                    brightness = ribbonLevel,
-                    soft = ribbonSoft,
+                    brightness = { ribbonLevel.value },
+                    soft = { ribbonSoft.value },
                     timeline = waveTimeline,
                     pulses = pulses,
-                    // Blurred well enough that half the resolution doesn't show.
-                    lowRes = ribbonSoft >= 2f,
+                    lowRes = ribbonLowRes,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -883,7 +887,8 @@ private const val DockBlur = 3f
  */
 @Composable
 private fun DockWave(config: com.minimaui.app.model.WaveConfig, look: com.minimaui.app.model.WavePageLook, timeline: com.minimaui.app.ui.components.WaveTimeline, hidden: Boolean) {
-    val level by animateFloatAsState(if (hidden) 0f else look.brightness / 100f, tween(350), label = "dockLevel")
+    val level = animateFloatAsState(if (hidden) 0f else look.brightness / 100f, tween(350), label = "dockLevel")
+    val shown by remember { derivedStateOf { level.value > 0.001f } }
     Box(
         Modifier
             .fillMaxSize()
@@ -895,12 +900,13 @@ private fun DockWave(config: com.minimaui.app.model.WaveConfig, look: com.minima
                 layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(-Dimens.PanelX.roundToPx(), -Dimens.PanelY.roundToPx()) }
             }
     ) {
-        if (level > 0.001f) {
+        if (shown) {
+            val soft = 1f + look.blur / 100f * WaveMaxBlur + DockBlur
             XmbWave(
                 style = WaveRibbon,
                 config = config,
-                brightness = level,
-                soft = 1f + look.blur / 100f * WaveMaxBlur + DockBlur,
+                brightness = { level.value },
+                soft = { soft },
                 timeline = timeline,
                 drives = false,
                 lowRes = true,

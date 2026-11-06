@@ -150,7 +150,7 @@ fun AppsScreen(
             }
     ) {
         // The same wave as behind All Games, a little blurred and dimmer so the icons stay in front.
-        XmbWave(style = wave, soft = 3f, brightness = AppsWaveBrightness, modifier = Modifier.fillMaxSize())
+        XmbWave(style = wave, soft = { 3f }, brightness = { AppsWaveBrightness }, modifier = Modifier.fillMaxSize())
         // Pages stack vertically, so a page change slides the icons up or down (eased) while they blur and fade.
         AnimatedContent(
             targetState = page,

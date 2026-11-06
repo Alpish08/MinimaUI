@@ -441,15 +441,21 @@ half4 main(float2 p) {
 
 /**
  * The wave behind a page: [style] 0 draws nothing, [WaveOriginal] the original four ribbons, [WaveRibbon] the custom wave as [config] says. [soft] blurs the lines (1 = as drawn,
- * 3 = a slight blur) and [brightness] scales everything (1 = full). [pulses] sends ripples across the ribbon (not the original wave).
+ * 3 = a slight blur) and [brightness] scales everything (1 = full); both are read only while drawing, so animating them doesn't
+ * recompose anything. [pulses] sends ripples across the ribbon (not the original wave).
+ *
+ * The wave is drawn into a layer of its own that is kept between frames: while the rest of the screen animates at the display's
+ * rate, the wave's shader only runs when the wave itself moves (on the beat), and every other frame reuses the picture. The custom
+ * wave's brightness is that layer's opacity (everything it draws scales with brightness, so this looks the same), so fading it
+ * between pages doesn't redraw it either.
  */
 @Composable
 fun XmbWave(
     style: Int,
     modifier: Modifier = Modifier,
     config: WaveConfig = WaveConfig.Default,
-    soft: Float = 1f,
-    brightness: Float = 1f,
+    soft: () -> Float = { 1f },
+    brightness: () -> Float = { 1f },
     pulses: WavePulses? = null,
     lowRes: Boolean = false,
     timeline: WaveTimeline? = null,
@@ -474,6 +480,11 @@ fun XmbWave(
     val livePulses by rememberUpdatedState(pulses)
     val resting by rememberUpdatedState(LocalResting.current)
     val waveClock = timeline ?: remember { WaveTimeline() }
+    // The blur as the wave's own frames see it: taken from [soft] on each step of the wave, so a blur fading between pages
+    // redraws the wave on its beat rather than on every frame of the display (a wave that doesn't drive its clock reads it directly).
+    val currentSoft by rememberUpdatedState(soft)
+    val steppedSoft = remember { mutableFloatStateOf(soft()) }
+    val softNow = { if (drives) steppedSoft.floatValue else soft() }
     // Only the draw reads the time, so nothing recomposes. The frame clock stops by itself while the app is in the background
     // (and the screen off, or a game on top), and the first step after it resumes is not counted. A wave that follows
     // another's [timeline] doesn't run it.
@@ -486,6 +497,7 @@ fun XmbWave(
                     waveClock.time += seconds * TimePerSecond * current[WaveKey.Speed] / 100f * (if (current[WaveKey.Reverse] > 0.5f) -1f else 1f)
                 }
                 last = now
+                steppedSoft.floatValue = currentSoft()
                 waveClock.clock = now / 1e9f // last: this is the write that redraws the wave
             }
             // Sleeping between frames (rather than skipping them) lets the app idle: it wakes on the shared beat, not on every vsync.
@@ -500,14 +512,12 @@ fun XmbWave(
     }
     Box(modifier) {
     Box(
-        // In a layer of its own (as the half-resolution one already is): a new frame of the wave then re-records only the wave,
-        // not everything else drawn in the same layer as it.
-        (if (lowRes) Modifier.halfResolution() else Modifier.fillMaxSize().graphicsLayer()).drawBehind {
+        (if (lowRes) Modifier.halfResolution(if (ribbon) brightness else null) else Modifier.fillMaxSize().cachedLayer(if (ribbon) brightness else null)).drawBehind {
             if (!ribbon) {
                 shader.setFloatUniform("size", size.width, size.height)
                 shader.setFloatUniform("time", waveClock.clock % 6283f)
-                shader.setFloatUniform("soft", soft.coerceAtLeast(1f))
-                shader.setFloatUniform("gain", brightness)
+                shader.setFloatUniform("soft", softNow().coerceAtLeast(1f))
+                shader.setFloatUniform("gain", brightness())
                 drawRect(ShaderBrush(shader))
                 return@drawBehind
             }
@@ -524,11 +534,11 @@ fun XmbWave(
             shader.setFloatUniform("base", 540f * c[WaveKey.Height] / 100f)
             shader.setFloatUniform("red", c[WaveKey.RedFade] / 100f, c[WaveKey.RedFadeDepth], c[WaveKey.RedFadeFalloff], c[WaveKey.RedOpacity] / 100f)
             shader.setFloatUniform("wht", c[WaveKey.WhiteFade] / 100f, c[WaveKey.WhiteFadeDepth], c[WaveKey.WhiteFadeFalloff], c[WaveKey.WhiteOpacity] / 100f)
-            shader.setFloatUniform("misc", c[WaveKey.RedWidth], c[WaveKey.WhiteWidth], c[WaveKey.Dither], brightness)
+            shader.setFloatUniform("misc", c[WaveKey.RedWidth], c[WaveKey.WhiteWidth], c[WaveKey.Dither], 1f) // brightness: the layer's opacity
             // With target "all" the fades share their strength between the white lines.
             val whiteCount = (count - 1).coerceAtLeast(1)
             shader.setFloatUniform("fadeWho", c.target.ordinal.toFloat(), if (c.target == WaveFadeTarget.All) 1f / kotlin.math.sqrt(whiteCount.toFloat()) else 1f)
-            shader.setFloatUniform("blur", soft.coerceAtLeast(1f))
+            shader.setFloatUniform("blur", softNow().coerceAtLeast(1f))
             val alive = livePulses?.fillTable(ripplePixels, rippleHeights, count) ?: 0
             if (alive > 0) {
                 rippleTurn[0] = 1 - rippleTurn[0]
@@ -563,7 +573,7 @@ class WaveTimeline {
  * Lays the content out at half the width and height and draws it into its own layer, which is then shown scaled up to the
  * full size: a quarter of the pixels to shade, for a wave that is blurred anyway.
  */
-private fun Modifier.halfResolution(): Modifier = layout { measurable, constraints ->
+private fun Modifier.halfResolution(alpha: (() -> Float)? = null): Modifier = layout { measurable, constraints ->
     val width = constraints.maxWidth
     val height = constraints.maxHeight
     val placeable = measurable.measure(androidx.compose.ui.unit.Constraints.fixed((width + 1) / 2, (height + 1) / 2))
@@ -573,6 +583,13 @@ private fun Modifier.halfResolution(): Modifier = layout { measurable, constrain
             scaleY = 2f
             transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
             compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+            if (alpha != null) this.alpha = alpha().coerceIn(0f, 1f)
         }
     }
+}
+
+/** Draws the content into a layer that is kept between frames (redrawn only when the content changes), shown at [alpha]. */
+private fun Modifier.cachedLayer(alpha: (() -> Float)? = null): Modifier = graphicsLayer {
+    compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+    if (alpha != null) this.alpha = alpha().coerceIn(0f, 1f)
 }
