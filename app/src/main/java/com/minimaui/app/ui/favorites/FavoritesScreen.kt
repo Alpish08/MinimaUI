@@ -70,7 +70,9 @@ import com.minimaui.app.ui.components.SelectionGlow
 import com.minimaui.app.ui.theme.Dimens
 import com.minimaui.app.ui.theme.SurfacePanel
 
-private val FavoritesDivider = Color(0xFF262626)
+// White at the strength that gives the old solid #262626 on the dock's #0A0A0A, so the plain dock looks the same, and over the
+// frosted dock (the wave behind Favorites) the line lets the wave through like the rest of the dock.
+private val FavoritesDivider = Color.White.copy(alpha = (0x26 - 0x0A) / (255f - 0x0A))
 
 /**
  * The bento panel behind Favorites and the Recently Played view: tiles in [slotsFor], one page of
@@ -475,4 +477,4 @@ private const val SwipeDistance = 100f
 private const val EditEdgeZone = 90f
 
 /** The dock's fill opacity while the custom wave shows behind Favorites (frosted, see the backdrop). */
-private const val DockSeeThrough = 0.4f
+private const val DockSeeThrough = 0.55f

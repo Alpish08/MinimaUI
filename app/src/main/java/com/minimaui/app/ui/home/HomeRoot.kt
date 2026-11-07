@@ -689,8 +689,8 @@ fun HomeRoot(
                         titles = WavePage.entries.map { it.title },
                         looks = WavePage.entries.map { settings.wavePageLook(it).let { l -> l.blur to l.brightness } },
                         selected = state.waveEditIndex,
-                        // The wave as it is: the sliders only change how the pages show it.
-                        preview = { m -> XmbWave(style = WaveRibbon, config = settings.wave, modifier = m) },
+                        // The wave as the page being customized shows it (its blur and brightness), easing over when the page or a slider changes.
+                        preview = { m -> WavePreview(settings.wave, settings.wavePageLook(WavePage.entries[state.waveEditPage]), m) },
                         onSeek = state::touchWaveSeek,
                         onSelect = state::touchWaveSlider,
                         onPage = { state.changeWaveEditPage(it) },
@@ -876,6 +876,18 @@ private fun launchOrigin(state: HomeState): Offset = when (state.screen) {
 
 /** The custom wave's blur at 100% on a page's Blur slider (the shader's soft, 1 = none). */
 private const val WaveMaxBlur = 5f
+
+/**
+ * The Customize preview: the wave blurred and as bright as [look] says (the page being customized), the same as behind that
+ * page, scaled to the preview. Both ease over when the look changes. At 0% brightness it shows nothing, as the page would.
+ */
+@Composable
+private fun WavePreview(config: com.minimaui.app.model.WaveConfig, look: com.minimaui.app.model.WavePageLook, modifier: Modifier) {
+    val level = animateFloatAsState(look.brightness / 100f, tween(350), label = "previewLevel")
+    val soft = animateFloatAsState(1f + look.blur / 100f * WaveMaxBlur, tween(350), label = "previewSoft")
+    val lowRes by remember { derivedStateOf { soft.value >= 2f } }
+    XmbWave(style = WaveRibbon, config = config, brightness = { level.value }, soft = { soft.value }, lowRes = lowRes, modifier = modifier)
+}
 
 /** How much more the Favorites dock blurs the wave behind it (added to the page's blur, in the shader's soft). */
 private const val DockBlur = 3f
