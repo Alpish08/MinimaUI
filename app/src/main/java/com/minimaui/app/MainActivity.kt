@@ -279,7 +279,7 @@ class MainActivity : ComponentActivity() {
         // Platform images dropped into MinimaUI/Platform Icons show up without a restart.
         library.refreshDefaultIcons()
         // Coming back (screen on, or from another app): ask again for the fast mode, going through "no preference" first so
-        // the window manager really applies it after a dimmed, 60 Hz stay.
+        // the window manager really applies it.
         applyRefreshRate()
         verifyRefreshRate()
         if (!foldersReady) foldersReady = MinimaFolders.ensure()
@@ -362,8 +362,7 @@ class MainActivity : ComponentActivity() {
             dimState.value = false
             bgm.setDimmed(false)
         }
-        // Always leave with the normal brightness and the fastest display mode (the screen may be switching off, and
-        // coming back on must not start in the dimmed 60 Hz mode).
+        // Always leave with the normal brightness and the fastest display mode (the screen may be switching off).
         window.attributes = window.attributes.apply {
             screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
             modeFor(Float.MAX_VALUE)?.let { preferredDisplayModeId = it }
@@ -398,7 +397,7 @@ class MainActivity : ComponentActivity() {
 
     private fun setDimmed(on: Boolean) {
         if (dimmed == on) return
-        // Never dim (and drop to 60 Hz) for a screen that is already switching off: the mode would be left behind for the wake-up.
+        // Never dim a screen that is already switching off.
         if (on && !getSystemService(android.os.PowerManager::class.java).isInteractive) return
         dimmed = on
         dimState.value = on
@@ -406,8 +405,9 @@ class MainActivity : ComponentActivity() {
         val attributes = window.attributes
         val system = android.provider.Settings.System.getInt(contentResolver, android.provider.Settings.System.SCREEN_BRIGHTNESS, 128) / 255f
         val dimLevel = (system * (if (settings.ambientClock) DIM_FRACTION else DIM_FRACTION_NO_CLOCK)).coerceAtLeast(0.02f)
-        // Dimmed means idle: ask for the display's 60 Hz mode (the app also draws at half of that).
-        modeFor(if (on) 60f else Float.MAX_VALUE)?.let { attributes.preferredDisplayModeId = it }
+        // The display mode stays as it is: dimmed, the app has next to nothing left to redraw (the wave and the glow hold
+        // still, the clock moves once a minute), so a 60 Hz mode would save little, and asking for one could leave the
+        // display stuck on it when the screen timed out in between.
         window.attributes = attributes
         bgm.setDimmed(on)
         // The brightness eases over the same second as the music.
@@ -486,8 +486,8 @@ class MainActivity : ComponentActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) hideSystemBars()
-        // Waking from the screen timeout can leave the window on the dimmed 60 Hz mode: ask again once it has the focus.
-        if (hasFocus && !dimmed) {
+        // Waking from the screen timeout: ask for the fast mode again once the window has the focus.
+        if (hasFocus) {
             applyRefreshRate()
             verifyRefreshRate()
         }
@@ -569,8 +569,8 @@ class MainActivity : ComponentActivity() {
     private val refreshCheck = Runnable {
         val fast = settings.uiFps >= 120
         val mode = display?.mode
-        // The display should be on its fast mode unless the screen is dimmed on purpose; if the system left it on 60 Hz, go again.
-        if (fast && !dimmed && mode != null && mode.refreshRate < 100f &&
+        // The display should be on its fast mode (dimmed or not); if the system left it on 60 Hz, go again.
+        if (fast && mode != null && mode.refreshRate < 100f &&
             getSystemService(android.os.PowerManager::class.java).isInteractive
         ) {
             applyRefreshRate()
@@ -586,7 +586,7 @@ class MainActivity : ComponentActivity() {
         dimHandler.postDelayed(refreshCheck, REFRESH_CHECK_MS)
     }
 
-    /** Goes through "no preference" first so the window manager really applies the mode, also after a dimmed 60 Hz stay. */
+    /** Goes through "no preference" first so the window manager really applies the mode. */
     private fun applyRefreshRate() {
         window.attributes = window.attributes.apply { preferredDisplayModeId = 0 }
         window.decorView.post { preferHighestRefreshRate() }
