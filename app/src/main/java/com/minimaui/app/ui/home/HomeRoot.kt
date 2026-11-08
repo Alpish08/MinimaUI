@@ -650,21 +650,22 @@ fun HomeRoot(
                 motion = { _, atHome -> if (atHome) SwitchMotion.Back else SwitchMotion.Forward }
             ) { atHome ->
                 // The pill moves aside with the Apps page's icons while one of its folders opens (zooming into its bubble).
+                val folderShown = state.screen == HomeScreen.Apps && state.appsNav.openFolderId != null
                 val folderOpen = animateFloatAsState(
-                    if (state.screen == HomeScreen.Apps && state.appsNav.openFolderId != null) 1f else 0f,
-                    tween(FolderOpenMotion.Millis, easing = EaseInOut), label = "pillFolder"
+                    if (folderShown) 1f else 0f,
+                    FolderOpenMotion.spec(closing = !folderShown), label = "pillFolder"
                 )
                 Box(
                     Modifier
                         .fillMaxSize()
                         .graphicsLayer {
                             val t = folderOpen.value
-                            val zoom = FolderOpenMotion.zoom(t)
+                            val zoom = FolderOpenMotion.zoom(t, closing = !folderShown)
                             scaleX = zoom
                             scaleY = zoom
                             val bubble = BentoLayouts.Apps.getOrNull(state.appsNav.slot) ?: BentoLayouts.Apps[0]
                             transformOrigin = TransformOrigin(bubble.centerX / Dimens.DesignWidth, bubble.centerY / Dimens.DesignHeight)
-                            alpha = FolderOpenMotion.alpha(t)
+                            alpha = FolderOpenMotion.alpha(t, closing = !folderShown)
                         }
                 ) {
                     StatusPill(

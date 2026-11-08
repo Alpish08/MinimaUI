@@ -131,7 +131,7 @@ fun AppsScreen(
     // Read in composition only as a yes/no, so the animation itself never recomposes the page.
     val opening by remember { androidx.compose.runtime.derivedStateOf { open.value > 0f } }
     if (folder == null && !opening && preparedFolder != null) origin[0] = slot
-    LaunchedEffect(folderOpen) { open.animateTo(if (folderOpen) 1f else 0f, tween(FolderOpenMotion.Millis, easing = EaseInOut)) }
+    LaunchedEffect(folderOpen) { open.animateTo(if (folderOpen) 1f else 0f, FolderOpenMotion.spec(closing = !folderOpen)) }
     val currentFolderOpen by androidx.compose.runtime.rememberUpdatedState(folderOpen)
     val currentPageTiles by androidx.compose.runtime.rememberUpdatedState(pageTiles(page))
     val currentFolderTiles by androidx.compose.runtime.rememberUpdatedState(folderTiles)
@@ -204,11 +204,11 @@ fun AppsScreen(
                 .fillMaxSize()
                 .graphicsLayer {
                     val t = open.value
-                    val zoom = FolderOpenMotion.zoom(t)
+                    val zoom = FolderOpenMotion.zoom(t, closing = !folderOpen)
                     scaleX = zoom
                     scaleY = zoom
                     transformOrigin = androidx.compose.ui.graphics.TransformOrigin(bubble.centerX / Dimens.DesignWidth, bubble.centerY / Dimens.DesignHeight)
-                    alpha = FolderOpenMotion.alpha(t)
+                    alpha = FolderOpenMotion.alpha(t, closing = !folderOpen)
                 }
         ) {
             // Pages stack vertically, so a page change slides the icons up or down (eased) while they blur and fade.
@@ -235,8 +235,8 @@ fun AppsScreen(
                         backdrop = ribbon,
                         arrival = LocalArrival.current,
                         // The opening folder's own bubble hands over to the panel growing out of it (else it would zoom
-                        // up behind the see-through panel too).
-                        fadedSlot = if (shownPage == page && (folderOpen || opening)) origin[0] else -1,
+                        // up behind the see-through panel too); closing, it comes back with the page, as the panel shrinks into it.
+                        fadedSlot = if (shownPage == page && folderOpen) origin[0] else -1,
                         fadedAlpha = { 1f - (open.value / 0.3f).coerceIn(0f, 1f) },
                     )
                 }
@@ -310,10 +310,10 @@ private fun FolderPanel(
     Box(
         Modifier
             .fillMaxSize()
-            .folderGrowth(from, progress) { t ->
-                // Opening, it comes in while the page is still fading (no empty moment); closing, it is gone before the page's
-                // icons come back, so its outline never lies over them.
-                if (opening) ((t - FolderPanelInOpening) / 0.3f).coerceIn(0f, 1f) else ((t - FolderPanelIn) / 0.25f).coerceIn(0f, 1f)
+            .folderGrowth(from, progress, closing = !opening && !prepared) { t ->
+                // Opening, it comes in while the page is still fading (no empty moment); closing, it fades as it shrinks back
+                // and is gone before the page's icons come back, so its outline never lies over them.
+                if (opening) ((t - FolderPanelInOpening) / 0.3f).coerceIn(0f, 1f) else ((t - FolderPanelOut) / 0.4f).coerceIn(0f, 1f)
             }
     ) {
         Box(
@@ -327,12 +327,13 @@ private fun FolderPanel(
     }
     // The name and the slots come in once the panel has mostly grown, moving and growing out of the bubble with it.
     Box(
-        Modifier.fillMaxSize().folderGrowth(from, progress) { t ->
+        Modifier.fillMaxSize().folderGrowth(from, progress, closing = !opening && !prepared) { t ->
             when {
                 // Ready behind a focused bubble: drawn faintly enough not to show, so its icons are already on the GPU when it opens.
                 prepared -> FolderWarmAlpha
                 opening -> ((t - FolderPanelInOpening - 0.05f) / 0.4f).coerceIn(0f, 1f)
-                else -> ((t - FolderPanelIn - 0.05f) / 0.4f).coerceIn(0f, 1f)
+                // Closing, they start fading at once (B answers right away), ahead of the panel.
+                else -> ((t - FolderContentsOut) / (1f - FolderContentsOut)).coerceIn(0f, 1f)
             }
         }
     ) {
@@ -367,12 +368,18 @@ private fun FolderPanel(
 /**
  * The panel (and its contents) growing in as the folder opens ([progress] 0 to 1): from [FolderStartScale] of its size,
  * starting a little toward the [bubble] it opens from, to its full size and place, shown at [alpha] of the progress. (Growing
- * from the bubble's own size would cover the most ground in the first few frames, which shows as a jump.)
+ * from the bubble's own size would cover the most ground in the first few frames, which shows as a jump.) [closing], it
+ * shrinks back toward the bubble steadily from the first frame, over the part of the closing it is still seen in.
  */
-private fun Modifier.folderGrowth(bubble: com.minimaui.app.ui.favorites.BentoSlot, progress: () -> Float, alpha: (Float) -> Float): Modifier =
+private fun Modifier.folderGrowth(
+    bubble: com.minimaui.app.ui.favorites.BentoSlot,
+    progress: () -> Float,
+    closing: Boolean,
+    alpha: (Float) -> Float,
+): Modifier =
     graphicsLayer {
         val t = progress()
-        val e = EaseInOut.transform(t)
+        val e = if (closing) 1f - ((1f - t) / (1f - FolderPanelOut)).coerceIn(0f, 1f) else EaseInOut.transform(t)
         this.alpha = alpha(t)
         val s = FolderStartScale + (1f - FolderStartScale) * e
         scaleX = s
@@ -507,10 +514,11 @@ private const val FolderTitleY = 148f
 private const val FolderLayoutScale = 0.87f
 private const val PageLayoutCenterY = 535f // the middle row of the page's layout
 private val FolderPanelFill = Color(0x40141414)
-// The panel only shows once the page has faded away (and, closing, is gone before the page's icons come back), so its
-// outline never lies over them.
-private val FolderPanelIn = FolderOpenMotion.FadeEnd
+// Opening, the panel comes in while the page fades. Closing (the progress going down evenly), the contents fade over the first
+// part, the panel a little after them, and it is gone just as the page's icons come back, so its outline never lies over them.
 private const val FolderPanelInOpening = 0.2f
+private const val FolderContentsOut = 0.62f
+private val FolderPanelOut = FolderOpenMotion.CloseFadeEnd
 private const val FolderWarmAlpha = 0.003f
 private const val FolderStartScale = 0.75f
 private const val FolderStartDrift = 0.25f // how far toward the bubble the panel starts (a share of the way)
@@ -524,9 +532,33 @@ internal object FolderOpenMotion {
     const val Millis = 420
     const val FadeEnd = 0.45f
 
-    private fun away(t: Float) = (t / FadeEnd).coerceIn(0f, 1f)
-    fun zoom(t: Float): Float = 1f + com.minimaui.app.ui.components.LaunchZoom * EaseInOut.transform(away(t))
-    fun alpha(t: Float): Float = 1f - away(t)
+    /**
+     * Closing isn't the opening played backwards (eased, that idles for the first frames and then drops the panel all at once):
+     * the progress goes down evenly over [CloseMillis], the folder shrinks and fades from the first frame, and the page comes
+     * back over the last half, settling into place (decelerating) as it fades in.
+     */
+    const val CloseMillis = 360
+    const val CloseFadeEnd = 0.45f // the closing panel is gone by here
+    private const val CloseBackFrom = 0.5f // the page starts coming back here (the panel is all but gone)
+
+    fun spec(closing: Boolean): androidx.compose.animation.core.AnimationSpec<Float> =
+        if (closing) tween(CloseMillis, easing = androidx.compose.animation.core.LinearEasing) else tween(Millis, easing = EaseInOut)
+
+    /** How far the page is out of the way (0 = in place, 1 = gone). */
+    private fun away(t: Float, closing: Boolean) =
+        if (closing) 1f - ((CloseBackFrom - t) / CloseBackFrom).coerceIn(0f, 1f) else (t / FadeEnd).coerceIn(0f, 1f)
+
+    fun zoom(t: Float, closing: Boolean = false): Float {
+        val a = away(t, closing)
+        val e = if (closing) 1f - androidx.compose.animation.core.LinearOutSlowInEasing.transform(1f - a) else EaseInOut.transform(a)
+        return 1f + com.minimaui.app.ui.components.LaunchZoom * e
+    }
+
+    /** Closing, the page shows quickly at first (so there is no empty moment after the panel), then settles in. */
+    fun alpha(t: Float, closing: Boolean = false): Float {
+        val a = away(t, closing)
+        return if (closing) 1f - a * a else 1f - a
+    }
 }
 // The small icons in a closed folder's bubble, as the Vita packs them: the folder's layout squeezed so that neighbours in a
 // row are 62 apart and the rows 55 (diagonal neighbours 63), the middle row's ends and the corners running under the edge.
