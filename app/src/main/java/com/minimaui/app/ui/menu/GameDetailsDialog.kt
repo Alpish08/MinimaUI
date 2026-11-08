@@ -46,24 +46,24 @@ fun GameDetailsDialog(
     Box(modifier = modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
-                .offset(416.dp, 280.dp)
-                .size(1088.dp, 520.dp)
+                .offset(((Dimens.DesignWidth - DetailsWidth) / 2f).dp, 280.dp)
+                .size(DetailsWidth.dp, 520.dp)
                 .clip(panelShape)
                 .background(MenuPanelFill)
                 .backgroundOutline(depth = 24.dp, corner = Dimens.PanelCorner)
         ) {
-            Text(
-                text = "Game Details",
-                color = TextPrimary,
-                fontWeight = FontWeight.Bold,
-                fontSize = 36.sp,
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 22.dp)
-            )
+            // Dimmed like the menu's "Hidden Games" and "Platforms" titles (a little bigger), halfway between the top and the first row.
+            Box(
+                Modifier.offset(0.dp, (DetailsFirstRowY / 2f - DetailsTitleHeight / 2f).dp).size(DetailsWidth.dp, DetailsTitleHeight.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = "Game Details", color = TextPrimary.copy(alpha = 0.6f), fontWeight = FontWeight.Bold, fontSize = 30.sp, maxLines = 1)
+            }
             rows.forEachIndexed { i, text ->
                 Box(
                     modifier = Modifier
-                        .offset(174.dp, (92f + i * 103.7f).dp)
-                        .size(740.dp, 80.dp)
+                        .offset(((DetailsWidth - DetailsRowWidth) / 2f).dp, (DetailsFirstRowY + i * 103.7f).dp)
+                        .size(DetailsRowWidth.dp, 80.dp)
                         .clip(CircleShape)
                         .background(MenuPillIdle)
                         .backgroundOutline(depth = 16.dp),
@@ -105,3 +105,9 @@ fun GameDetailsDialog(
         )
     }
 }
+
+// As wide as the menu's sub-box: the rows sit about as far from the sides as the first row is from the top.
+private const val DetailsWidth = 926f
+private const val DetailsRowWidth = 740f
+private const val DetailsFirstRowY = 92f
+private const val DetailsTitleHeight = 44f
