@@ -41,6 +41,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.draw.drawWithContent
 import com.minimaui.app.data.InstalledApp
 import com.minimaui.app.data.InstalledApps
 import com.minimaui.app.ui.components.ControlHint
@@ -71,8 +75,16 @@ private val IconFill = Color(0xFF262626)
 
 private fun clamp01(v: Float) = v.coerceIn(0f, 1f)
 
-/** Rows fade out toward the header at the top and toward the control hints at the bottom. */
-private fun fadeAt(centerY: Float): Float = clamp01(centerY / 200f) * clamp01((900f - centerY) / 260f)
+/** Rows fade out toward the header at the top (toward the bottom, the whole grid fades smoothly: see [BottomFade]). */
+private fun fadeAt(centerY: Float): Float = clamp01(centerY / 200f)
+
+/** The grid fades out smoothly toward the panel's bottom edge, from just under the second row (the lowest the focus goes). */
+private const val BottomFadeStart = 660f
+private val BottomFade = Brush.verticalGradient(
+    0f to Color.Black,
+    BottomFadeStart / 844f to Color.Black,
+    1f to Color.Transparent,
+)
 
 /**
  * A grid of installed apps, [PickerColumns] to a row, scrolling by rows so the selected one stays on the first or
@@ -144,6 +156,15 @@ fun AppPicker(
                 val focusRect = GlowRect(glowX, glowY, Diameter, Diameter, Diameter / 2f)
                 SelectionGlow(focusRect)
 
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                        .drawWithContent {
+                            drawContent()
+                            drawRect(BottomFade, blendMode = BlendMode.DstIn)
+                        }
+                ) {
                 for (i in maxOf((selectedRow - 3) * PickerColumns, 0)..minOf((selectedRow + 4) * PickerColumns + PickerColumns - 1, items.lastIndex)) {
                     key(items[i].packageName) { AppCell(
                         app = items[i],
@@ -154,6 +175,7 @@ fun AppPicker(
                         // Only the focused icon is a little larger.
                         focusScale = if (i == selected) 1f + PickerGrow else 1f
                     ) }
+                }
                 }
 
                 FocusRing(

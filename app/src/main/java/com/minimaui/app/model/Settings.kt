@@ -200,12 +200,14 @@ class Settings(platforms: List<Platform>, private val store: LibraryStore) {
     })
 
     private fun defaultLook(page: WavePage): WavePageLook = when (page) {
-        WavePage.AllGames -> WavePageLook(0, 100)
+        // The author's own looks (2026-11-07): sharp and a little dimmed behind All Games, blurred and half as bright behind
+        // Apps, sharp at half brightness behind Favorites (so its dock is frosted).
+        WavePage.AllGames -> WavePageLook(0, 80)
         // The Apps look of the build before there were pages (blur and dim), if there is one.
         WavePage.Apps -> store.loadString(KEY_WAVE_APPS)?.split(",")?.mapNotNull { it.trim().toIntOrNull() }?.takeIf { it.size == 2 }
             ?.let { WavePageLook(it[0].coerceIn(0, 100), (100 - it[1]).coerceIn(0, 100)) }
-            ?: WavePageLook(40, 65)
-        WavePage.Favorites -> WavePageLook(40, 0)
+            ?: WavePageLook(30, 50)
+        WavePage.Favorites -> WavePageLook(0, 50)
     }
 
     /** Rolls a new custom wave look (and shows it: the wave switches to CUSTOM). */

@@ -93,6 +93,7 @@ fun BentoScreen(
     pressTick: Int = 0,
     logoAlpha: Float = 1f,
     onTap: (slot: Int) -> Unit = {},
+    onLongPress: () -> Unit = {},
     onSwipe: (delta: Int) -> Unit = {},
     onEditHold: (slot: Int) -> Unit = {},
     onEditDrag: (slot: Int) -> Unit = {},
@@ -113,15 +114,23 @@ fun BentoScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            // Touch: tap a tile to launch it, swipe left/right to change page (the owner ignores both in Edit Mode).
-            .pointerInput(page) {
-                detectTapGestures { offset ->
+            // Touch: tap a tile to launch it, swipe left/right to change page (the owner ignores both in Edit Mode); outside
+            // Edit Mode, holding a game's tile turns Edit Mode on.
+            .pointerInput(page, editMode) {
+                fun tileAt(offset: Offset): Int {
                     val x = offset.x / density - Dimens.PanelX.value
                     val y = offset.y / density - Dimens.PanelY.value
-                    val entries = entriesFor(page)
-                    slotsFor(page).indexOfFirst { s ->
+                    return slotsFor(page).indexOfFirst { s ->
                         x >= s.x.value && x <= s.x.value + s.width.value && y >= s.y.value && y <= s.y.value + s.height.value
-                    }.takeIf { it >= 0 && (entries.getOrNull(it) != null || (showLauncher && page == 0 && it == LauncherSlot)) }?.let(onTap)
+                    }
+                }
+                detectTapGestures(
+                    onLongPress = if (editMode) null else { offset ->
+                        if (entriesFor(page).getOrNull(tileAt(offset)) != null) onLongPress()
+                    },
+                ) { offset ->
+                    val entries = entriesFor(page)
+                    tileAt(offset).takeIf { it >= 0 && (entries.getOrNull(it) != null || (showLauncher && page == 0 && it == LauncherSlot)) }?.let(onTap)
                 }
             }
             // Touch: swipe left or right and let go; the page then slides over (the owner ignores it in Edit Mode).

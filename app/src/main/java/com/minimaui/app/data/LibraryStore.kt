@@ -102,6 +102,9 @@ class LibraryStore(context: Context) {
         return editor.commit()
     }
 
+    /** Whether a list was ever saved under [key] (an empty one counts). */
+    fun hasList(key: String): Boolean = prefs.contains(LIST_PREFIX + key)
+
     fun loadList(key: String): List<String> =
         prefs.getString(LIST_PREFIX + key, null)?.split(LIST_SEPARATOR)?.filter { it.isNotEmpty() }.orEmpty()
 
