@@ -63,6 +63,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.TransformOrigin
 import com.minimaui.app.ui.favorites.BentoLayouts
 import com.minimaui.app.ui.apps.AppsScreen
+import com.minimaui.app.ui.apps.FolderOpenMotion
 import com.minimaui.app.ui.favorites.BentoScreen
 import com.minimaui.app.ui.menu.FavoritesMoreMenu
 import com.minimaui.app.ui.menu.FolderChooser
@@ -514,11 +515,14 @@ fun HomeRoot(
                 }
             )
             // Read only by the wave's draw (and the two switches below), so fading between pages' looks doesn't recompose the pages.
-            val ribbonLevel = animateFloatAsState(if (state.waveEditOpen) 0f else pageLook.brightness / 100f, tween(350), label = "ribbonLevel")
+            // Dimmer behind an open folder of the Apps page.
+            val folderDim = if (state.screen == HomeScreen.Apps && state.appsNav.openFolderId != null) AppFolderWaveDim else 1f
+            val ribbonLevel = animateFloatAsState(if (state.waveEditOpen) 0f else pageLook.brightness / 100f * folderDim, tween(350), label = "ribbonLevel")
             val ribbonSoft = animateFloatAsState(1f + pageLook.blur / 100f * WaveMaxBlur, tween(350), label = "ribbonSoft")
             val ribbonShown by remember { derivedStateOf { ribbonLevel.value > 0.001f } }
-            // Blurred well enough that half the resolution doesn't show.
-            val ribbonLowRes by remember { derivedStateOf { ribbonSoft.value >= 2f } }
+            // At half the resolution whenever it is blurred at all (it doesn't show, and a blurred wave is the costliest to draw:
+            // each line reaches far more pixels), also while a page's blur fades in or out; sharp, at full resolution.
+            val ribbonLowRes by remember { derivedStateOf { ribbonSoft.value > WaveSharpBelow } }
             if (ribbon && ribbonShown) {
                 XmbWave(
                     style = WaveRibbon,
@@ -571,6 +575,7 @@ fun HomeRoot(
                             pressTick = state.pressTick,
                             logoAlpha = boot.value,
                             onTap = state::tapFavorite,
+                        onLongPress = { state.touchLongPress(HomeScreen.Favorites) },
                             onSwipe = state::swipeFavoritesPage,
                             onEditHold = { state.touchEditHold(HomeScreen.Favorites, it) },
                             onEditDrag = { state.touchEditDrag(HomeScreen.Favorites, it) },
@@ -605,22 +610,29 @@ fun HomeRoot(
                         held = state.held,
                         onTapPlatform = state::touchPlatform,
                         onTapGame = state::touchGame,
+                        onLongPressGame = { state.touchLongPress(HomeScreen.AllGames) },
                         onSwipe = state::swipeXmb,
                         onEditHoldPlatform = state::touchEditHoldPlatform,
                         onEditDragPlatform = state::touchEditDragPlatform,
                         onEditRelease = state::touchEditRelease,
                     )
                     HomePage.Apps -> AppsScreen(
-                        apps = state.apps,
+                        pageTiles = state.appsNav::shownOnPage,
                         page = state.appsNav.page,
                         slot = state.appsNav.slot,
                         pageCount = state.appsNav.pageCount,
                         editMode = state.editMode,
-                        held = state.held,
+                        carrying = state.appsNav.carrying,
+                        folder = state.appsNav.openFolder,
+                        folderTiles = state.appsNav.shownInFolder(),
+                        folderSlot = state.appsNav.folderSlot,
+                        preparedFolder = state.appsNav.currentFolder,
                         wave = pageWave,
                         ribbon = ribbon,
                         pressTick = state.pressTick,
                         onTap = state::tapApp,
+                        onLongPress = { state.touchLongPress(HomeScreen.Apps) },
+                        onTapOutsideFolder = state::tapOutsideAppFolder,
                         onSwipe = state::swipeAppsPage,
                         onEditHold = { state.touchEditHold(HomeScreen.Apps, it) },
                         onEditDrag = { state.touchEditDrag(HomeScreen.Apps, it) },
@@ -637,7 +649,24 @@ fun HomeRoot(
                 modifier = Modifier.fillMaxSize(),
                 motion = { _, atHome -> if (atHome) SwitchMotion.Back else SwitchMotion.Forward }
             ) { atHome ->
-                Box(Modifier.fillMaxSize()) {
+                // The pill moves aside with the Apps page's icons while one of its folders opens (zooming into its bubble).
+                val folderOpen = animateFloatAsState(
+                    if (state.screen == HomeScreen.Apps && state.appsNav.openFolderId != null) 1f else 0f,
+                    tween(FolderOpenMotion.Millis, easing = EaseInOut), label = "pillFolder"
+                )
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            val t = folderOpen.value
+                            val zoom = FolderOpenMotion.zoom(t)
+                            scaleX = zoom
+                            scaleY = zoom
+                            val bubble = BentoLayouts.Apps.getOrNull(state.appsNav.slot) ?: BentoLayouts.Apps[0]
+                            transformOrigin = TransformOrigin(bubble.centerX / Dimens.DesignWidth, bubble.centerY / Dimens.DesignHeight)
+                            alpha = FolderOpenMotion.alpha(t)
+                        }
+                ) {
                     StatusPill(
                         docked = { if (atHome) 0f else 1f },
                         modifier = Modifier.offset {
@@ -869,10 +898,17 @@ fun HomeRoot(
 /** The middle of the focused tile (design px): what a launch zooms in on. */
 private fun launchOrigin(state: HomeState): Offset = when (state.screen) {
     HomeScreen.AllGames -> Offset(ListCenterX, FocusCenterY)
-    HomeScreen.Apps -> BentoLayouts.Apps.getOrNull(state.appsNav.slot)?.let { Offset(it.centerX, it.centerY) }
+    HomeScreen.Apps -> BentoLayouts.Apps.getOrNull(if (state.appsNav.openFolderId != null) state.appsNav.folderSlot else state.appsNav.slot)
+        ?.let { Offset(it.centerX, it.centerY) }
     HomeScreen.Favorites -> state.slotsIn(state.favView, state.favoritesNav.page).getOrNull(state.favoritesNav.slot)
         ?.let { Offset(Dimens.PanelX.value + it.centerX, Dimens.PanelY.value + it.centerY) }
 } ?: Offset(Dimens.DesignWidth / 2f, Dimens.DesignHeight / 2f)
+
+/** Below this softness (1 = sharp) the custom wave is drawn at full resolution; above it, at half. */
+private const val WaveSharpBelow = 1.05f
+
+/** How bright the wave stays behind an open folder of the Apps page (a share of the page's own brightness). */
+private const val AppFolderWaveDim = 0.35f
 
 /** The custom wave's blur at 100% on a page's Blur slider (the shader's soft, 1 = none). */
 private const val WaveMaxBlur = 5f

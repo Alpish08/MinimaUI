@@ -15,6 +15,8 @@ import com.minimaui.app.data.GameHubGames
 import com.minimaui.app.model.AppEntry
 import com.minimaui.app.model.WavePage
 import com.minimaui.app.model.AppLibrary
+import com.minimaui.app.model.AppSlot
+import com.minimaui.app.model.AppFolder
 import com.minimaui.app.data.InstalledApp
 import com.minimaui.app.ui.components.WaveOriginal
 import com.minimaui.app.ui.components.WaveRibbon
@@ -47,6 +49,7 @@ enum class LevelKind { Volume, Brightness }
 
 enum class EditItem {
     EditTitle, SelectCover, ToggleFavorite, AddToFolder, CustomEmulator, RemoveFromLibrary, EditMode, EditAppTitle, HideApp,
+    AppToFolder, RenameAppFolder, DeleteAppFolder,
     PlatformIcon, PlatformTitle, PlatformEmulator,
 }
 
@@ -110,7 +113,7 @@ class HomeState(
     /** Changes whenever the cursor moves anywhere, so a push against an edge (nothing moved) can stay silent. */
     val cursorSignature: Int
         get() = listOf(
-            screen, selectedPlatformIndex, gameIndex, favoritesNav.page, favoritesNav.slot, appsNav.page, appsNav.slot,
+            screen, selectedPlatformIndex, gameIndex, favoritesNav.page, favoritesNav.slot, appsNav.signature,
             menuOpen, menuFocus, menuCategory, menuPage, menuAction, pickerIndex, searchIndex, searchOnResults, searchKey, held, settings.volume,
             waveEditOpen, waveEditPage, waveEditIndex, settings.wave.values.contentHashCode(), WavePage.entries.map(settings::wavePageLook),
             moreOpen, moreIndex, folderPickerOpen, folderIndex,
@@ -210,9 +213,14 @@ class HomeState(
     private var menuContext by mutableStateOf(MenuContext.Favorites)
     private var menuGame by mutableStateOf<GameEntry?>(null)
     private var menuApp by mutableStateOf<AppEntry?>(null)
+    /** The folder bubble focused on the Apps page when the menu opened, and the folder that was open (the app is in it). */
+    private var menuAppFolder by mutableStateOf<AppFolder?>(null)
+    private var menuInAppFolder by mutableStateOf<String?>(null)
 
     private var titleEditGameId by mutableStateOf<String?>(null)
     private var titleEditAppId by mutableStateOf<String?>(null)
+    /** Renaming a folder of the Apps page. */
+    private var titleEditAppFolderId by mutableStateOf<String?>(null)
     private var titleEditPlatformId by mutableStateOf<String?>(null)
     var titleEditValue by mutableStateOf(TextFieldValue())
         private set
@@ -230,7 +238,7 @@ class HomeState(
     var entryDigits by mutableStateOf(false)
         private set
     val ownKeyboardEntry: Boolean
-        get() = titleEditGameId != null || titleEditAppId != null || titleEditPlatformId != null || newFolderEntry
+        get() = titleEditGameId != null || titleEditAppId != null || titleEditPlatformId != null || newFolderEntry || titleEditAppFolderId != null
 
     private fun startEntry(initial: String) {
         entryText = initial
@@ -243,12 +251,15 @@ class HomeState(
     /** Adding a GameHub game takes two text entries: 1 = its title, 2 = its id. */
     private var gameHubStep by mutableIntStateOf(0)
     private var gameHubTitle = ""
-    val isEditingTitle: Boolean get() = titleEditGameId != null || titleEditAppId != null || titleEditPlatformId != null || gameHubStep != 0 || newFolderEntry
+    val isEditingTitle: Boolean
+        get() = titleEditGameId != null || titleEditAppId != null || titleEditPlatformId != null || gameHubStep != 0 || newFolderEntry ||
+            titleEditAppFolderId != null
     /** True while a GameHub game is being added (two entries: title, then id). */
     val addingGameHubGame: Boolean get() = gameHubStep != 0 || newFolderEntry
     val titleEditHeading: String
         get() = when {
             newFolderEntry -> "New Folder"
+            titleEditAppFolderId != null -> "Rename Folder"
             gameHubStep == 1 -> "Steam Game Title"
             gameHubStep == 2 -> "Steam Game ID"
             titleEditAppId != null -> "Edit App Title"
@@ -289,6 +300,10 @@ class HomeState(
         private set
     /** When picking a folder for a game: that game's id (null = just opening a folder). */
     private var folderPickerGameId by mutableStateOf<String?>(null)
+    /** When picking a folder of the Apps page for an app: that app's id (the list then shows the Apps page's folders). */
+    private var folderPickerAppId by mutableStateOf<String?>(null)
+    /** How many folders the folder list shows (the "+" row comes after them). */
+    private val folderCount: Int get() = if (folderPickerAppId != null) appLibrary.folders.size else library.folders.size
     var newFolderEntry by mutableStateOf(false)
         private set
 
@@ -348,12 +363,14 @@ class HomeState(
             is FavView.Folder -> library.folders.firstOrNull { it.id == v.id }?.name
         }
 
-    val folderNames: List<String> get() = library.folders.map { it.name }
-    val folderPickerTitle: String get() = if (folderPickerGameId != null) "Add To Folder" else "Folders"
+    val folderNames: List<String> get() = if (folderPickerAppId != null) appLibrary.folders.map { it.name } else library.folders.map { it.name }
+    val folderPickerTitle: String get() = if (folderPickerGameId != null || folderPickerAppId != null) "Add To Folder" else "Folders"
     val moreHints = listOf(ControlHint("A", "Enter"), ControlHint("B", "Back"))
     val folderHints: List<ControlHint>
         get() = when {
             folderPickerGameId != null -> listOf(ControlHint("A", "Add / Remove"), ControlHint("B", "Back"))
+            folderPickerAppId != null ->
+                listOf(ControlHint("A", if (folderIndex < folderCount) "Add" else "New Folder"), ControlHint("B", "Back"))
             folderIndex in library.folders.indices -> listOf(ControlHint("X", "Delete"), ControlHint("A", "Open"), ControlHint("B", "Back"))
             else -> listOf(ControlHint("A", "New Folder"), ControlHint("B", "Back"))
         }
@@ -432,20 +449,21 @@ class HomeState(
         favoritesNav.focusAt(LauncherFlat)
     }
 
-    private fun openFolderPicker(gameId: String?) {
+    private fun openFolderPicker(gameId: String?, appId: String? = null) {
         folderPickerGameId = gameId
+        folderPickerAppId = appId
         folderIndex = 0
         folderPickerOpen = true
     }
 
     private fun onFolderKey(key: Key, isRepeat: Boolean): Boolean {
         // The folders, then a "+" row for a new one.
-        val count = library.folders.size + 1
+        val count = folderCount + 1
         when (key) {
             Key.DirectionUp -> folderIndex = (folderIndex - 1).coerceAtLeast(0)
             Key.DirectionDown -> folderIndex = (folderIndex + 1).coerceAtMost(count - 1)
             Key.ButtonA, Key.Enter, Key.DirectionCenter -> if (!isRepeat) chooseFolder(folderIndex)
-            Key.ButtonX -> if (!isRepeat && folderPickerGameId == null && folderIndex in library.folders.indices) {
+            Key.ButtonX -> if (!isRepeat && folderPickerGameId == null && folderPickerAppId == null && folderIndex in library.folders.indices) {
                 val folder = library.folders[folderIndex]
                 library.deleteFolder(folder.id)
                 folderIndex = folderIndex.coerceAtMost(library.folders.size)
@@ -459,6 +477,19 @@ class HomeState(
 
     fun chooseFolder(index: Int) {
         folderIndex = index
+        folderPickerAppId?.let { appId ->
+            val appFolder = appLibrary.folders.getOrNull(index)
+            if (appFolder == null) {
+                newFolderEntry = true
+                startEntry("")
+                return
+            }
+            folderPickerOpen = false
+            if (appLibrary.addToFolder(appFolder.id, appId)) showToast("Added to \"${appFolder.name}\"")
+            else showToast("\"${appFolder.name}\" is full", error = true)
+            appsNav.clamp()
+            return
+        }
         val folder = library.folders.getOrNull(index)
         if (folder == null) {
             newFolderEntry = true
@@ -573,7 +604,18 @@ class HomeState(
     }
 
     val favoritesNav = FavoritesNav()
-    val appsNav = AppsNav()
+    val appsNav = AppsNav(appLibrary, { editMode }, object : AppsNavActions {
+        override fun launch(app: AppEntry) = actions.launchApp(app)
+        override fun pickApps(at: AppSlot) {
+            appLibrary.addAt = at
+            openPicker(PickerTarget.Apps)
+        }
+        override fun toast(text: String, error: Boolean) = showToast(text, error)
+        override fun press() { pressTick++ }
+        override fun haptic() = this@HomeState.haptic()
+        override fun pageSound() = this@HomeState.pageSound()
+        override fun openSound() = this@HomeState.pageSound()
+    })
 
     /** Bumped whenever A confirms a tile, so the focused one can play its pressed feel. */
     var pressTick by mutableIntStateOf(0)
@@ -785,8 +827,7 @@ class HomeState(
     private val activeNav: GridNav?
         get() = when (screen) {
             HomeScreen.Favorites -> favoritesNav
-            HomeScreen.Apps -> appsNav
-            HomeScreen.AllGames -> null
+            HomeScreen.Apps, HomeScreen.AllGames -> null
         }
 
     /** Platforms the user has switched on, in the order they arranged them (alphabetical until they do). */
@@ -831,7 +872,11 @@ class HomeState(
     }
 
     val menuEditTitle: String
-        get() = if (platformEditing) "Edit Current Platform" else if (menuContext == MenuContext.Apps) "Edit Current App" else "Edit Current Game"
+        get() = when {
+            platformEditing -> "Edit Current Platform"
+            menuContext == MenuContext.Apps -> if (menuAppFolder != null) "Edit Current Folder" else "Edit Current App"
+            else -> "Edit Current Game"
+        }
 
     /** The folder being viewed in Favorites, while the menu was opened there (null on every other screen and view). */
     private val openFolder: FavView.Folder?
@@ -840,7 +885,11 @@ class HomeState(
     // Edit Mode itself lives in the Customization menu now.
     private val editItems: List<EditItem>
         get() = if (platformEditing) listOf(EditItem.PlatformIcon, EditItem.PlatformTitle, EditItem.PlatformEmulator) else when (menuContext) {
-            MenuContext.Apps -> if (menuApp != null) listOf(EditItem.EditAppTitle, EditItem.ToggleFavorite, EditItem.HideApp) else emptyList()
+            MenuContext.Apps -> when {
+                menuAppFolder != null -> listOf(EditItem.RenameAppFolder, EditItem.DeleteAppFolder)
+                menuApp != null -> listOf(EditItem.EditAppTitle, EditItem.ToggleFavorite, EditItem.AppToFolder, EditItem.HideApp)
+                else -> emptyList()
+            }
             MenuContext.Favorites, MenuContext.AllGames ->
                 if (menuGame != null) {
                     // The custom emulator is for ROM files and GameHub-listed Steam games (which a Steam launcher can start instead); shortcuts and Android games start through their own app.
@@ -875,7 +924,7 @@ class HomeState(
             if (page == 1) {
                 hiddenGames.map { MenuEntry(it.title) }.ifEmpty { listOf(MenuEntry("No hidden games")) }
             } else {
-                editItems.map { MenuEntry(editItemLabel(it), danger = it == EditItem.RemoveFromLibrary) }
+                editItems.map { MenuEntry(editItemLabel(it), danger = it == EditItem.RemoveFromLibrary || it == EditItem.DeleteAppFolder) }
             }
         MenuCategory.Customize -> when (page) {
             0 -> listOf(
@@ -959,11 +1008,15 @@ class HomeState(
         EditItem.PlatformEmulator -> "Default Emulator"
         EditItem.EditAppTitle -> "Edit App Title"
         EditItem.HideApp -> "Hide App"
+        EditItem.AppToFolder -> if (menuInAppFolder != null) "Remove From Folder" else "Add To Folder"
+        EditItem.RenameAppFolder -> "Rename Folder"
+        EditItem.DeleteAppFolder -> "Delete Folder"
     }
 
     /** The hints for the bottom bar of the page currently shown. */
     val hints: List<ControlHint>
         get() = when {
+            screen == HomeScreen.Apps && appsNav.hints() != null -> appsNav.hints().orEmpty()
             editMode && screen == HomeScreen.AllGames ->
                 listOf(ControlHint("Y", "Sort"), ControlHint("X", "Remove"), ControlHint("A", if (onPlusRow) "Add" else "Move"), ControlHint("B", "Back"))
             editMode -> listOf(ControlHint("X", "Remove"), ControlHint("A", "Move"), ControlHint("B", "Back"))
@@ -987,6 +1040,8 @@ class HomeState(
         // Start is handled by onStart (a tap opens the menu, holding it opens the system settings).
         if (key == Key.ButtonStart) return true
         if (menuOpen) return onMenuKey(key, isRepeat)
+        // The Apps page handles its own keys (moving, carrying, folders); what it leaves (Start, Select, X, B) comes here.
+        if (screen == HomeScreen.Apps && appsNav.onKey(key, isRepeat)) return true
         when (key) {
             Key.ButtonB, Key.Escape, Key.Back -> {
                 // Always consumed, so B with nothing to go back to doesn't fall through to Android's Back (recents).
@@ -1012,17 +1067,18 @@ class HomeState(
             }
         }
         val nav = activeNav
-        return if (nav != null) onGridKey(nav, key, isRepeat) else onAllGamesKey(key, isRepeat)
+        return when {
+            nav != null -> onGridKey(nav, key, isRepeat)
+            screen == HomeScreen.Apps -> false
+            else -> onAllGamesKey(key, isRepeat)
+        }
     }
 
     /** X in Edit Mode: takes the focused app off the Apps page, or the focused game out of Favorites. */
     private fun removeCurrent() {
         held = false
         when (screen) {
-            HomeScreen.Apps -> apps.getOrNull(appsNav.index)?.let {
-                appLibrary.hide(it.id)
-                appsNav.clamp()
-            }
+            HomeScreen.Apps -> Unit // the Apps page's own X (see AppsNav)
             HomeScreen.Favorites -> favoriteGameAt(favoritesNav.index)?.let {
                 when (val v = favView) {
                     is FavView.Folder -> library.toggleInFolder(v.id, it.id)
@@ -1057,8 +1113,11 @@ class HomeState(
             selectDownAt = android.os.SystemClock.uptimeMillis()
             selectIgnoreRelease = detailsGame != null
             if (selectIgnoreRelease) detailsGame = null
+            selectHoldHandler.removeCallbacks(selectHold)
+            selectHoldHandler.postDelayed(selectHold, SelectHoldMillis)
             return false
         }
+        selectHoldHandler.removeCallbacks(selectHold)
         if (!selectHeld) return false
         selectHeld = false
         val quick = android.os.SystemClock.uptimeMillis() - selectDownAt <= SelectTapMillis
@@ -1070,6 +1129,21 @@ class HomeState(
     /** A shoulder button while Select is held (a hotkey combo, Key Mapper's): it counts as one, so releasing Select does not open the details card. */
     fun onSelectCombo() {
         selectCombo = true
+        selectHoldHandler.removeCallbacks(selectHold)
+    }
+
+    // Holding Select (alone) on a focused game, app or folder turns Edit Mode on, like holding it by touch.
+    private val selectHoldHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val selectHold = Runnable {
+        if (!selectHeld || selectCombo || overlayOpen || editMode) return@Runnable
+        val focused = when (screen) {
+            HomeScreen.Apps -> appsNav.currentApp != null || appsNav.currentFolder != null
+            else -> currentGame() != null
+        }
+        if (!focused) return@Runnable
+        selectIgnoreRelease = true
+        haptic()
+        changeEditMode(true)
     }
 
     /** The system's volume or brightness changed (whoever changed it: hardware keys, Key Mapper's hotkeys): shows its bar. */
@@ -1082,6 +1156,7 @@ class HomeState(
     /** Select is no longer considered held (the app lost focus, or another button was pressed, so its release was missed). */
     fun releaseSelect() {
         selectHeld = false
+        selectHoldHandler.removeCallbacks(selectHold)
     }
 
     fun hideLevel() {
@@ -1099,6 +1174,7 @@ class HomeState(
             folderPickerOpen -> folderPickerOpen = false
             moreOpen -> moreOpen = false
             menuOpen -> if (waveEditOpen) closeWaveEdit() else if (menuFocus == MenuFocus.Actions) menuFocus = MenuFocus.Categories else menuOpen = false
+            screen == HomeScreen.Apps && appsNav.canStepBack -> appsNav.back()
             held -> held = false
             editMode -> changeEditMode(false)
             favView != FavView.Favorites -> leaveView()
@@ -1154,11 +1230,11 @@ class HomeState(
         editMode = on
         held = false
         if (on) editModeSound()
-        if (!on) appsNav.clamp()
+        appsNav.clamp()
     }
 
     fun changeActivePage(delta: Int) {
-        activeNav?.changePage(delta)
+        if (screen == HomeScreen.Apps) appsNav.swipe(delta) else activeNav?.changePage(delta)
     }
 
     fun updateTitleEdit(value: TextFieldValue) {
@@ -1167,6 +1243,22 @@ class HomeState(
 
     fun saveTitleEdit() {
         val title = (if (ownKeyboardEntry) entryText else titleEditValue.text).trim()
+        titleEditAppFolderId?.let { id ->
+            if (title.isNotEmpty()) appLibrary.renameFolder(id, title)
+            cancelTitleEdit()
+            return
+        }
+        if (newFolderEntry && folderPickerAppId != null) {
+            val appId = folderPickerAppId
+            if (title.isNotEmpty() && appId != null) {
+                appLibrary.createFolderWith(title, appId)
+                folderPickerOpen = false
+                showToast("Added to \"$title\"")
+                appsNav.clamp()
+            }
+            cancelTitleEdit()
+            return
+        }
         if (newFolderEntry) {
             if (title.isNotEmpty()) {
                 val folder = library.createFolder(title)
@@ -1205,6 +1297,7 @@ class HomeState(
 
     fun cancelTitleEdit() {
         newFolderEntry = false
+        titleEditAppFolderId = null
         gameHubStep = 0
         titleEditGameId = null
         titleEditAppId = null
@@ -1229,7 +1322,9 @@ class HomeState(
             HomeScreen.Favorites -> MenuContext.Favorites
         }
         menuGame = currentGame()
-        menuApp = if (screen == HomeScreen.Apps) apps.getOrNull(appsNav.index) else null
+        menuApp = if (screen == HomeScreen.Apps) appsNav.currentApp else null
+        menuAppFolder = if (screen == HomeScreen.Apps) appsNav.currentFolder else null
+        menuInAppFolder = if (screen == HomeScreen.Apps) appsNav.openFolderId else null
         menuCategory = MenuCategory.EditGame
         menuPage = 0
         menuFocus = MenuFocus.Categories
@@ -1259,7 +1354,6 @@ class HomeState(
     private fun onConfirm(nav: GridNav) {
         if (editMode) {
             if (nav.currentExists) held = !held
-            else if (nav === appsNav) openPicker(PickerTarget.Apps)
         } else if (nav === favoritesNav) {
             if (hasLauncher && nav.index == LauncherFlat) {
                 openMore()
@@ -1267,9 +1361,6 @@ class HomeState(
             }
             pressTick++
             favoriteGameAt(nav.index)?.let(actions.launchGame)
-        } else if (nav === appsNav) {
-            pressTick++
-            apps.getOrNull(nav.index)?.let(actions.launchApp)
         }
     }
 
@@ -1285,8 +1376,7 @@ class HomeState(
 
     private val editNav: GridNav? get() = when (screen) {
         HomeScreen.Favorites -> favoritesNav
-        HomeScreen.Apps -> appsNav
-        HomeScreen.AllGames -> null
+        HomeScreen.Apps, HomeScreen.AllGames -> null
     }
 
     private var lastEdgeFlip = 0L
@@ -1294,6 +1384,7 @@ class HomeState(
     /** Edit Mode, touch: a long press on the tile in [slot] picks it up. */
     fun touchEditHold(on: HomeScreen, slot: Int) {
         if (!editTouchable(on)) return
+        if (on == HomeScreen.Apps) return appsNav.touchHold(slot)
         val nav = editNav ?: return
         val flat = nav.flatOf(slot)
         if (!nav.existsAt(flat)) return
@@ -1304,22 +1395,27 @@ class HomeState(
 
     /** Edit Mode, touch: the picked-up tile is dragged over [slot] and takes that place. */
     fun touchEditDrag(on: HomeScreen, slot: Int) {
+        if (on == HomeScreen.Apps) {
+            if (editTouchable(on)) appsNav.touchDrag(slot)
+            return
+        }
         if (!editTouchable(on) || !held) return
         editNav?.let { it.dragHeldTo(it.flatOf(slot)) }
     }
 
     /** Edit Mode, touch: the picked-up tile is at the panel's edge toward the previous ([delta] -1) or next page; turns the page now and then. */
     fun touchEditEdge(on: HomeScreen, delta: Int) {
-        if (!editTouchable(on) || !held) return
+        if (!editTouchable(on) || !(held || (on == HomeScreen.Apps && appsNav.carrying))) return
         val now = android.os.SystemClock.uptimeMillis()
         if (now - lastEdgeFlip < EdgeFlipMillis) return
         lastEdgeFlip = now
-        editNav?.movePageHeld(delta)
+        if (on == HomeScreen.Apps) appsNav.touchEdge(delta) else editNav?.movePageHeld(delta)
     }
 
     /** Edit Mode, touch: the finger lets go, which puts the tile (or platform) down. */
     fun touchEditRelease() {
         if (editMode && held) held = false
+        if (editMode) appsNav.touchRelease()
     }
 
     /** Edit Mode on All Games: a long press on platform [index] picks it up. */
@@ -1339,24 +1435,26 @@ class HomeState(
 
     /** A tap on the icon in [slot] of the current Apps page: focus it and launch it. */
     fun tapApp(slot: Int) {
-        if (editTouchable(HomeScreen.Apps)) {
-            // Edit Mode: a tap focuses the app (like moving the cursor there); on an empty slot it opens the app picker (like A).
-            val flat = appsNav.flatOf(slot)
-            appsNav.focusAt(flat)
-            if (!appsNav.existsAt(flat)) openPicker(PickerTarget.Apps)
-            return
-        }
-        if (!touchable(HomeScreen.Apps)) return
-        val flat = appsNav.page * BentoLayouts.Apps.size + slot
-        val app = apps.getOrNull(flat) ?: return
-        appsNav.focusAt(flat)
-        pressTick++
-        actions.launchApp(app)
+        // In Edit Mode a tap focuses the slot (on an empty one it opens the app picker, like A); otherwise it launches the
+        // app or opens the folder.
+        if (editTouchable(HomeScreen.Apps) || touchable(HomeScreen.Apps)) appsNav.tap(slot)
+    }
+
+    /** A tap outside the open folder of the Apps page closes it. */
+    fun tapOutsideAppFolder() {
+        if (editTouchable(HomeScreen.Apps) || touchable(HomeScreen.Apps)) appsNav.tapOutside()
     }
 
     /** A vertical swipe on the Apps page: [delta] 1 for the next page, -1 for the previous. */
     fun swipeAppsPage(delta: Int) {
-        if (touchable(HomeScreen.Apps)) appsNav.changePage(delta)
+        if (touchable(HomeScreen.Apps)) appsNav.swipe(delta)
+    }
+
+    /** Touch: holding a cover or an app icon on [on] (outside Edit Mode, with nothing open over the page) turns Edit Mode on. */
+    fun touchLongPress(on: HomeScreen) {
+        if (!touchable(on)) return
+        haptic()
+        changeEditMode(true)
     }
 
     /** A tap on the tile in [slot] of the current Favorites page: focus it and launch it. */
@@ -1416,6 +1514,14 @@ class HomeState(
                 if (platform != null) {
                     gameIndexes[platform.id] = (gameIndex + 1).coerceAtMost(maxOf(rowCount(platform) - 1, 0))
                 }
+            // L1 / R1: straight to the first or the last game of the column.
+            Key.ButtonL1, Key.ButtonR1 -> if (!isRepeat && platform != null && !held) {
+                val target = if (key == Key.ButtonL1) 0 else maxOf(rowCount(platform) - 1, 0)
+                if (target != gameIndex) {
+                    gameIndexes[platform.id] = target
+                    haptic()
+                }
+            }
             else -> return false
         }
         return true
@@ -1580,11 +1686,11 @@ class HomeState(
     }
 
     fun touchFolderStep(delta: Int) {
-        if (folderPickerOpen && !newFolderEntry) folderIndex = (folderIndex + delta).coerceIn(0, library.folders.size)
+        if (folderPickerOpen && !newFolderEntry) folderIndex = (folderIndex + delta).coerceIn(0, folderCount)
     }
 
     fun touchFolderSeek(fraction: Float) {
-        if (folderPickerOpen && !newFolderEntry) folderIndex = (fraction * library.folders.size).roundToInt().coerceIn(0, library.folders.size)
+        if (folderPickerOpen && !newFolderEntry) folderIndex = (fraction * folderCount).roundToInt().coerceIn(0, folderCount)
     }
 
     fun touchSearchStep(delta: Int) {
@@ -1905,6 +2011,26 @@ class HomeState(
             }
             EditItem.RemoveFromLibrary -> game?.let { library.removeGame(it.id) }
             EditItem.HideApp -> app?.let { appLibrary.hide(it.id) }
+            EditItem.AppToFolder -> app?.let {
+                if (menuInAppFolder != null) {
+                    appLibrary.takeOutOfFolder(it.id)
+                    showToast("Moved to the Apps page")
+                } else {
+                    menuOpen = false
+                    openFolderPicker(null, appId = it.id)
+                    return
+                }
+            }
+            EditItem.RenameAppFolder -> menuAppFolder?.let {
+                menuOpen = false
+                titleEditAppFolderId = it.id
+                startEntry(it.name)
+                return
+            }
+            EditItem.DeleteAppFolder -> menuAppFolder?.let {
+                appLibrary.deleteFolder(it.id)
+                showToast("Deleted \"${it.name}\"; its apps are back on the page")
+            }
             EditItem.EditMode -> changeEditMode(!editMode)
         }
         menuOpen = false
@@ -2124,33 +2250,7 @@ class HomeState(
         }
     }
 
-    /** The Apps page: pages stack vertically, so moving up/down off the top/bottom row changes page. */
-    inner class AppsNav : GridNav(BentoLayouts.Apps.size) {
-        override fun slotsOn(page: Int): List<BentoSlot> = BentoLayouts.Apps
-        override val itemCount: Int get() = apps.size
-        override val emptySlotsFocusable: Boolean get() = editMode
-
-        // In Edit Mode there is always one more page than the apps need, when the last one is full: a page of "+" slots
-        // waiting to be filled (so a full page never stops you adding more apps).
-        override val pageCount: Int
-            get() = if (editMode) maxOf(1, (itemCount + 1 + pageSize - 1) / pageSize) else super.pageCount
-
-        override fun moveItem(from: Int, to: Int) {
-            val list = apps
-            appLibrary.move(list[from].id, list[to].id)
-        }
-
-        override fun edgeTarget(direction: Direction): Int? = when {
-            direction == Direction.Up && slot < FirstRowSize && page > 0 ->
-                (page - 1) * BentoLayouts.Apps.size + slot + (BentoLayouts.Apps.size - FirstRowSize)
-            direction == Direction.Down && slot >= BentoLayouts.Apps.size - FirstRowSize && page < pageCount - 1 ->
-                (page + 1) * BentoLayouts.Apps.size + slot - (BentoLayouts.Apps.size - FirstRowSize)
-            else -> null
-        }
-    }
-
     private companion object {
-        const val FirstRowSize = 3
         const val FavoritesPageSize = 8
         const val SearchMaxHits = 20
         const val SearchMaxQuery = 28
@@ -2158,6 +2258,8 @@ class HomeState(
         val PlusPlatforms = setOf("android", "steam")
         const val XmbRepeatMillis = 55L
         const val EdgeFlipMillis = 750L
+        /** How long Select is held (on its own) before it turns Edit Mode on. */
+        const val SelectHoldMillis = 600L
         val XmbKeys = setOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight)
         const val AudioVolumeIndex = 3
         const val AudioPage = 1

@@ -233,6 +233,7 @@ fun AllGamesScreen(
     held: Boolean = false,
     onTapPlatform: (Int) -> Unit = {},
     onTapGame: (Int) -> Unit = {},
+    onLongPressGame: () -> Unit = {},
     onSwipe: (dx: Int, dy: Int) -> Unit = { _, _ -> },
     onEditHoldPlatform: (Int) -> Unit = {},
     onEditDragPlatform: (Int) -> Unit = {},
@@ -256,8 +257,21 @@ fun AllGamesScreen(
         modifier = modifier
             .fillMaxSize()
             // Touch: tap a platform to select it, tap a cover (the focused one launches), swipe to move along the row or the list.
-            .pointerInput(platforms, platformIndex, gamesFor) {
-                detectTapGestures { offset ->
+            .pointerInput(platforms, platformIndex, gamesFor, editMode) {
+                // Outside Edit Mode, holding a game's cover turns Edit Mode on.
+                fun coverRowAt(offset: Offset): Int? {
+                    val x = offset.x / density
+                    val y = offset.y / density
+                    val platform = platforms.getOrNull(platformIndex) ?: return null
+                    val selected = gameIndexFor(platform)
+                    for (row in selected..minOf(selected + 2, gamesFor(platform).size - 1)) {
+                        val d = (row - selected).toFloat()
+                        val coverWidth = CoverWidth * slotValue(SlotScale, d)
+                        if (abs(x - ListCenterX) <= coverWidth / 2f && abs(y - slotValue(SlotCenterY, d)) <= coverWidth * CoverAspect / 2f) return row
+                    }
+                    return null
+                }
+                detectTapGestures(onLongPress = if (editMode) null else { offset -> if (coverRowAt(offset) != null) onLongPressGame() }) { offset ->
                     val x = offset.x / density
                     val y = offset.y / density
                     val p = platformPosition.value

@@ -1,19 +1,13 @@
 package com.minimaui.app.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.animation.slideInVertically
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.remember
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -37,8 +31,8 @@ data class ControlHint(val key: String, val label: String)
 /**
  * Button hints, e.g. "Y - All Games", as bare text. As the global [pill] they float above the pages (they are not
  * part of them, so page changes don't touch them) and are slightly larger; otherwise they are the plain row used inside the
- * menus (21sp, or the same size as the pages' with [pageSize]). When the hints change, only the ones that change move: a new
- * one opens its place and rises in, a gone one fades as its place closes, and the hints that stay don't flicker.
+ * menus (21sp, or the same size as the pages' with [pageSize]). When the hints change, the new ones fade in over the old ones
+ * fading out, right-aligned, with no movement.
  */
 @Composable
 fun ControlHintBar(
@@ -48,59 +42,43 @@ fun ControlHintBar(
     pageSize: Boolean = false,
     fontSize: TextUnit? = null,
 ) {
-    if (!pill) {
-        HintRow(hints, large = pageSize, modifier = modifier, fontSize = fontSize)
-        return
-    }
-    Box(modifier = modifier.height(Dimens.HintBarHeight), contentAlignment = Alignment.CenterEnd) {
-        HintRow(hints, large = true, modifier = Modifier.height(Dimens.HintBarHeight).padding(horizontal = 17.dp))
+    val large = pill || pageSize
+    val rowModifier = if (pill) Modifier.height(Dimens.HintBarHeight).padding(horizontal = 17.dp) else Modifier
+    AnimatedContent(
+        targetState = hints,
+        transitionSpec = {
+            fadeIn(tween(220, delayMillis = 60, easing = EaseInOut)) togetherWith fadeOut(tween(140)) using
+                SizeTransform(clip = false) { _, _ -> snap() }
+        },
+        contentAlignment = Alignment.CenterEnd,
+        modifier = if (pill) modifier.height(Dimens.HintBarHeight) else modifier,
+        label = "controlHints"
+    ) { items ->
+        HintRow(items, large = large, modifier = rowModifier, fontSize = fontSize)
     }
 }
 
-/** A hint on screen: [shown] goes false when it is no longer among the hints, and it is dropped once it has faded out. */
-private class ShownHint(val hint: ControlHint, val shown: MutableTransitionState<Boolean>)
-
 @Composable
 private fun HintRow(hints: List<ControlHint>, large: Boolean, modifier: Modifier, fontSize: TextUnit? = null) {
-    val gap = if (large) 43.dp else 32.dp
-    // The hints on screen: the current ones in order, plus the ones fading out where they were. The first set shows at once.
-    val onScreen = remember { mutableStateListOf<ShownHint>().apply { hints.forEach { add(ShownHint(it, MutableTransitionState(true))) } } }
-    if (onScreen.filter { it.shown.targetState }.map { it.hint } != hints) {
-        onScreen.forEach { if (it.hint !in hints) it.shown.targetState = false }
-        hints.forEachIndexed { index, hint ->
-            if (onScreen.none { it.hint == hint && it.shown.targetState }) {
-                // In front of the next current hint that is already on screen (or at the end).
-                val next = hints.drop(index + 1).firstNotNullOfOrNull { h -> onScreen.indexOfFirst { it.hint == h && it.shown.targetState }.takeIf { it >= 0 } }
-                onScreen.add(next ?: onScreen.size, ShownHint(hint, MutableTransitionState(false).apply { targetState = true }))
-            }
-        }
-    }
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        onScreen.forEachIndexed { index, item ->
-            key(item) {
-                AnimatedVisibility(
-                    visibleState = item.shown,
-                    enter = expandHorizontally(tween(260, easing = EaseInOut), expandFrom = Alignment.Start) +
-                        fadeIn(tween(220, delayMillis = 60, easing = EaseInOut)) + slideInVertically(tween(260, easing = EaseInOut)) { it / 5 },
-                    exit = fadeOut(tween(140)) + shrinkHorizontally(tween(260, delayMillis = 60, easing = EaseInOut), shrinkTowards = Alignment.Start)
-                ) {
-                    Text(
-                        text = buildAnnotatedString {
-                            withStyle(SpanStyle(color = TextPrimary, fontWeight = FontWeight.Bold)) {
-                                append("${item.hint.key} - ")
-                            }
-                            withStyle(SpanStyle(color = HintLabel, fontWeight = FontWeight.Normal)) {
-                                append(item.hint.label)
-                            }
-                        },
-                        fontSize = fontSize ?: if (large) 27.4.sp else 21.sp,
-                        maxLines = 1,
-                        softWrap = false,
-                        modifier = Modifier.padding(start = if (index == 0) 0.dp else gap)
-                    )
-                }
-                if (item.shown.isIdle && !item.shown.currentState) SideEffect { onScreen.remove(item) }
-            }
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(if (large) 43.dp else 32.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        hints.forEach { hint ->
+            Text(
+                text = buildAnnotatedString {
+                    withStyle(SpanStyle(color = TextPrimary, fontWeight = FontWeight.Bold)) {
+                        append("${hint.key} - ")
+                    }
+                    withStyle(SpanStyle(color = HintLabel, fontWeight = FontWeight.Normal)) {
+                        append(hint.label)
+                    }
+                },
+                fontSize = fontSize ?: if (large) 27.4.sp else 21.sp,
+                maxLines = 1,
+                softWrap = false
+            )
         }
     }
 }

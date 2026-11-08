@@ -42,6 +42,12 @@ const val AppsWaveBrightness = 0.66f
 /** Wave time runs this fast at Speed 100%; it is added up per frame from the real time, so the pace doesn't depend on the frame rate. */
 private const val TimePerSecond = 0.36f
 
+/**
+ * How far up from the bottom of the screen the custom wave fades into black, in design px (of 540): half the screen, further
+ * than the side fades reach (45% of half the width, 216), starting just below the middle of the wave.
+ */
+private const val WaveBottomFade = 270f
+
 /** The most lines the shader draws: ten white ones and the red one. */
 private const val MaxLines = 11
 
@@ -435,6 +441,9 @@ half4 main(float2 p) {
         float edgeIn = clamp(min(ex, 1.0 - ex) / more.y, 0.0, 1.0);
         acc *= 1.0 - pow(1.0 - edgeIn, 1.5);
     }
+    // And into black toward the bottom of the screen, the same way but reaching further in (see WaveBottomFade).
+    float bottomIn = clamp((540.0 - d.y) / $WaveBottomFade, 0.0, 1.0);
+    acc *= 1.0 - pow(1.0 - bottomIn, 1.5);
     return half4(half3(acc.rgb), half(acc.a));
 }
 """
