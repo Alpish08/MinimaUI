@@ -29,9 +29,9 @@ When nothing has been touched for 30 seconds the focus glow and the scrolling ti
 # Features
 * **Favorites**: a bento of your favorite games and apps, with folders and a recently played view.
 * **All Games**: an XMB-style row of platforms with a column of covers under each one (16:9 covers).
-* **Apps**: your apps in pages, separate from the games.
+* **Apps**: your apps in pages, separate from the games, placed in any slot you like, with Vita-style bubble folders (see [Apps and folders](#apps-and-folders)).
 * **Search** (L2 + R2): type with MinimaUI's own on-screen keyboard (letters and a number pad), or with the touch screen.
-* **Edit Mode**: rearrange favorites, platforms and apps; remove games from the library (and bring them back from the *Hidden Games* page of *Edit Current Platform*, in Edit Mode on All Games).
+* **Edit Mode** (from the Customization menu, or hold a cover or an app icon, or hold **Select** on one): rearrange favorites, platforms and apps; remove games from the library (and bring them back from the *Hidden Games* page of *Edit Current Platform*, in Edit Mode on All Games).
 * **Per-game and per-platform emulators**: pick any installed app as the emulator, or go back to the original.
 * **Platform tiles** show the platform's logo from `MinimaUI/Platform Icons/` when it has one (named like the console, e.g. `Sony Playstation.png`), otherwise its name as text; give a platform its own title or image if you like. A platform shows on All Games while it has games (Android and Steam always); switch any platform on or off by hand in Customization (in Edit Mode on All Games or Favorites).
 * An optional animated XMB wave with its own blur and brightness on each page, background music, UI sounds, your own boot animation, settings backups, and an ambient clock.
@@ -85,11 +85,12 @@ MinimaUI does not include any games, BIOS files, emulators or artwork of the pla
 | **B** | back |
 | **Y** | Favorites ⇄ All Games |
 | **X** | Apps ⇄ games |
-| **L1 / R1**, right stick | turn pages |
+| **L1 / R1**, right stick | turn pages (on All Games, L1 / R1 jump to the first / last game) |
 | **L2 + R2** | search |
 | **Start** (tap) | the menu |
 | **Start** (hold) | Android's own settings |
 | **Select** (tap) | details card of the focused game (time played and more) |
+| **Select** (hold) | Edit Mode |
 | **M1 / M2** | send a ripple through the wave |
 
 The **Start menu** has four pages:
@@ -131,12 +132,21 @@ Sounds are not included. If you want a PS Vita feel, the community-made [PS Vita
 
 **Steam launchers**: besides GameHub, a Steam game can be started by GameNative (by its Steam App ID) or GameHub Lite: choose the app as the game's *Custom Emulator*, or for the whole Steam platform in Edit Mode (*Edit Current Platform → Default Emulator*). Games pinned from Moonlight ("Add to home screen") show up under Windows, like the Artemis ones. Neither launcher has been tried on a device yet.
 
+# Apps and folders
+Apps and folders sit in any slot of the Apps page (rows of 3, 4 and 3); gaps stay where you leave them. In **Edit Mode**:
+* **A** picks the focused app or folder up and carries it: the cursor moves it while everything else stays put, and the one in the slot under it is shown where yours came from. **A** puts it down (the two swap), **B** puts it back. Near the top or bottom (touch) or with **L1 / R1** it moves to another page; there is always a blank page at the end.
+* **A** on an empty slot opens the app picker; the apps you choose go there.
+* **X** takes an app off the page, deletes a folder (its apps go back to the page) or, inside a folder, moves an app back to the page.
+* **Y** opens a folder.
+
+**Folders** are bubbles that show the apps inside in small. Make and fill them from the Start menu: *Edit Current App → Add To Folder* (pick a folder, or **+** for a new one named with the on-screen keyboard; it takes the app's place). In a folder the entry is *Remove From Folder*; on a bubble the menu offers *Rename Folder* and *Delete Folder*. A folder holds ten apps, in the same layout. **A** opens it, **B** (or a tap outside) closes it.
+
 # The wave
 The first time you run MinimaUI the XMB wave is on, in the author's own look. *Start → Customization → XMB Wave* switches it between OFF, ORIGINAL (the original wave) and CUSTOM (the MinimaUI wave).
 
 With CUSTOM selected, press **X** on that row to **Customize** it. There is a page for each of All Games, Apps and Favorites, each with a **Blur** and a **Brightness** slider and a preview of the wave. At 0% brightness the wave isn't drawn behind that page at all, which also saves battery. Turn the pages with **L1 / R1**, the right stick, a swipe or the page dots. **X** rolls a new random wave, and **Y** saves the current one as a file in `MinimaUI/Backup/Custom Wave/`; restore one from *Backup / Restore*. The files are plain `key = value` text, so you can also fine-tune them by hand.
 
-Out of the box the wave is sharp behind All Games, blurred and dimmer behind Apps, and off behind Favorites. Turn it on there and the Favorites dock becomes frosted glass over it.
+Out of the box the wave is the author's own: sharp behind All Games, blurred and dimmer behind Apps, and at half brightness behind Favorites, where the dock becomes frosted glass over it. It fades out toward the bottom of the screen.
 
 # Optional extras
 * **Volume and brightness bars** over other apps: MinimaUI has an accessibility service for this (Android Settings → Accessibility → MinimaUI). It's off until you enable it, and nothing else needs it. The same service also watches the Home button (that one key only, nothing else you press) so that **holding Home for 5 seconds restarts MinimaUI**, which replays the boot animation.
