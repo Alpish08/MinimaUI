@@ -61,7 +61,7 @@ class KbKey(val label: String, val action: KeyAction, val x: Float, val y: Float
     val centerY: Float get() = y + height / 2f
 }
 
-/** The search keyboard's keys (three letter rows, Space, and Delete and Enter stacked at the right) and how the cursor moves between them. */
+/** The search keyboard's keys (three letter rows, Space, and Delete over Enter at the right) and how the cursor moves between them. */
 object SearchKeyboardLayout {
     // The panel spans the screen's width near the bottom and runs past its edge.
     const val X = 0f
@@ -86,22 +86,22 @@ object SearchKeyboardLayout {
         letters(1, "ASDFGHJKL", 157f)
         letters(2, "ZXCVBNM", 248f)
         add(KbKey("Space", KeyAction.Space, 506f, rowY(3), 911f, KeyHeight))
-        // Enter and Delete are as tall as the other keys, stacked under the L key's centre: Enter on the M key's line, Delete on the space bar's.
-        add(KbKey("Enter", KeyAction.Enter, SideKeyX, rowY(2), SideKeyWidth, KeyHeight))
-        add(KbKey("Delete", KeyAction.Delete, SideKeyX, rowY(3), SideKeyWidth, KeyHeight))
-        // Shift is Delete mirrored over the middle of the screen; it toggles the capitals like the L button.
+        // Delete and Enter are as tall as the other keys, stacked under the L key's centre: Delete on the M key's line, Enter on the space bar's.
+        add(KbKey("Enter", KeyAction.Enter, SideKeyX, rowY(3), SideKeyWidth, KeyHeight))
+        add(KbKey("Delete", KeyAction.Delete, SideKeyX, rowY(2), SideKeyWidth, KeyHeight))
+        // Shift is Enter mirrored over the middle of the screen; it toggles the capitals like the L button.
         add(KbKey("Shift", KeyAction.Shift, 1920f - SideKeyX - SideKeyWidth, rowY(3), SideKeyWidth, KeyHeight))
     }
 
-    /** The number pad (R1): 1 to 9 in three rows, 0 under the 5, Enter and Delete at the right and the space bar under them. */
+    /** The number pad (R1): 1 to 9 in three rows, 0 under the 5, Delete over Enter at the right and the space bar under them. */
     val numpadKeys: List<KbKey> = buildList {
         fun rowY(row: Int) = FirstRowY + row * RowPitch
         val columns = floatArrayOf(703f, 885f, 1067f)
         for (n in 1..9) add(KbKey(n.toString(), KeyAction.Letter, columns[(n - 1) % 3], rowY((n - 1) / 3), KeyWidth, KeyHeight))
         add(KbKey("0", KeyAction.Letter, columns[1], rowY(3), KeyWidth, KeyHeight))
         add(KbKey("Space", KeyAction.Space, 1322f, rowY(3), 409f, KeyHeight))
-        add(KbKey("Enter", KeyAction.Enter, 1514f, rowY(1), SideKeyWidth, KeyHeight))
-        add(KbKey("Delete", KeyAction.Delete, 1514f, rowY(2), SideKeyWidth, KeyHeight))
+        add(KbKey("Enter", KeyAction.Enter, 1514f, rowY(2), SideKeyWidth, KeyHeight))
+        add(KbKey("Delete", KeyAction.Delete, 1514f, rowY(1), SideKeyWidth, KeyHeight))
     }
 
     fun keysFor(digits: Boolean): List<KbKey> = if (digits) numpadKeys else keys
