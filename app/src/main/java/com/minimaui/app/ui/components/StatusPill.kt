@@ -175,7 +175,7 @@ fun StatusPill(modifier: Modifier = Modifier, docked: () -> Float = { 0f }) {
 @Composable
 private fun BatteryGlyph(fillFraction: Float, charging: Boolean) {
     // The gap around the bolt clears what is under it, so the glyph is drawn in a layer of its own.
-    Canvas(modifier = Modifier.size(45.dp, 27.dp).graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }) {
+    Canvas(modifier = Modifier.size(BatteryGlyphWidth, BatteryGlyphHeight).graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }) {
         val toCanvas = android.graphics.Matrix().apply { setScale(size.width / BatteryGridWidth, size.height / BatteryGridHeight) }
         fun shape(data: String) = androidx.core.graphics.PathParser.createPathFromPathData(data).apply { transform(toCanvas) }
         val outline = shape(BatteryOutlinePath).asComposePath()
@@ -206,6 +206,9 @@ private fun BatteryGlyph(fillFraction: Float, charging: Boolean) {
 }
 
 // Iconify's landscape battery "O" (its config_landscapeBattery*PathO strings), on a 20 x 12 grid.
+// Sized so the outline comes out as large as the status bar's (45 x 26 px; the outline fills 18.4 x 11.1 of the grid).
+private val BatteryGlyphWidth = 49.dp
+private val BatteryGlyphHeight = 28.dp
 private const val BatteryGridWidth = 20f
 private const val BatteryGridHeight = 12f
 private val BatteryOutlineColor = Color.White.copy(alpha = 0.35f)
