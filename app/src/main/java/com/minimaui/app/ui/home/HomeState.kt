@@ -980,6 +980,7 @@ class HomeState(
         val platform = visiblePlatforms.getOrNull(selectedPlatformIndex)
         return when (item) {
             EditItem.CustomEmulator -> menuGame?.customEmulator != null
+            EditItem.SelectCover -> menuGame?.let { library.customCover(it.id, menuContext == MenuContext.AllGames) } != null
             EditItem.PlatformIcon -> platform != null && library.customPlatformIcon(platform) != null
             EditItem.PlatformTitle -> platform != null && library.platformTitle(platform) != null
             EditItem.PlatformEmulator -> platform != null && library.platformEmulator(platform) != null
@@ -1945,6 +1946,7 @@ class HomeState(
         val platform = visiblePlatforms.getOrNull(selectedPlatformIndex)
         when (item) {
             EditItem.CustomEmulator -> menuGame?.let { library.setCustomEmulator(it.id, null) }
+            EditItem.SelectCover -> menuGame?.let { library.clearCover(it.id, menuContext == MenuContext.AllGames) }
             EditItem.PlatformIcon -> platform?.let { library.setPlatformIcon(it.id, null) }
             EditItem.PlatformTitle -> platform?.let { library.setPlatformTitle(it.id, null) }
             EditItem.PlatformEmulator -> platform?.let { library.setPlatformEmulator(it.id, null) }

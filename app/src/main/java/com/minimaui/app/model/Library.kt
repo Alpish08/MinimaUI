@@ -265,6 +265,20 @@ class Library(
         store.saveString(XMB_COVER_PREFIX + id, uri)
     }
 
+    /** The cover the user picked for a game, for All Games ([forXmb]) or Favorites, or null if they haven't. */
+    fun customCover(id: String, forXmb: Boolean): String? = if (forXmb) xmbCoverOverrides[id] else coverOverrides[id]
+
+    /** Forgets the cover the user picked for a game (All Games' when [forXmb], else Favorites'), back to the usual one. */
+    fun clearCover(id: String, forXmb: Boolean) {
+        if (forXmb) {
+            xmbCoverOverrides.remove(id)
+            store.saveString(XMB_COVER_PREFIX + id, null)
+        } else {
+            coverOverrides.remove(id)
+            store.saveString(COVER_PREFIX + id, null)
+        }
+    }
+
     /** Takes a game out of the library (and so out of Favorites); its saved edits are kept. */
     fun removeGame(id: String) {
         if (id in removedIds) return
