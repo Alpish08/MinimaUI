@@ -86,6 +86,7 @@ private const val ResultTextPadding = 86f
 @Composable
 fun SearchDialog(
     query: String,
+    cursor: Int,
     results: List<String>,
     selected: Int,
     onResults: Boolean,
@@ -206,35 +207,7 @@ fun SearchDialog(
                     .unfocusedOutline(outlineDepthFor(FieldHeight)),
                 contentAlignment = Alignment.Center
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                    Text(
-                        text = query,
-                        color = TextPrimary,
-                        fontSize = 33.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        softWrap = false,
-                    )
-                    // The text cursor is simply there or not (twice a second), still while the screen is dimmed, and gone with the keyboard.
-                    val dimmed = LocalDimmed.current
-                    var cursorOn by remember { mutableStateOf(true) }
-                    androidx.compose.runtime.LaunchedEffect(dimmed, onResults) {
-                        cursorOn = true
-                        if (dimmed || onResults) return@LaunchedEffect
-                        while (true) {
-                            kotlinx.coroutines.delay(CursorBlinkMillis)
-                            cursorOn = !cursorOn
-                        }
-                    }
-                    Box(
-                        Modifier
-                            .padding(start = 4.dp)
-                            .size(3.dp, 44.dp)
-                            .graphicsLayer { alpha = if (cursorOn && !onResults) 1f else 0f }
-                            .background(TextPrimary)
-                    )
-                }
+                KeyboardFieldText(query, cursor, caretShown = !onResults)
             }
 
             // A line between the field and the results.

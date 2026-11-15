@@ -235,6 +235,9 @@ class HomeState(
         private set
     var entryCaps by mutableStateOf(false)
         private set
+    /** Where the text cursor is in [entryText] (0 = before the first character), moved with L1 / R1. */
+    var entryCursor by mutableIntStateOf(0)
+        private set
     var entryDigits by mutableStateOf(false)
         private set
     val ownKeyboardEntry: Boolean
@@ -242,6 +245,7 @@ class HomeState(
 
     private fun startEntry(initial: String) {
         entryText = initial
+        entryCursor = initial.length
         entrySelected = initial.isNotEmpty()
         entryKey = 0
         entryCaps = false
@@ -626,6 +630,9 @@ class HomeState(
         private set
     var searchQuery by mutableStateOf("")
         private set
+    /** Where the text cursor is in [searchQuery] (0 = before the first character), moved with L1 / R1. */
+    var searchCursor by mutableIntStateOf(0)
+        private set
     var searchOnResults by mutableStateOf(false)
         private set
     var searchIndex by mutableIntStateOf(0)
@@ -681,6 +688,7 @@ class HomeState(
     fun openSearch() {
         if (searchOpen || menuOpen || pickerOpen || detailsGame != null || isEditingTitle || editMode || moreOpen || folderPickerOpen) return
         searchQuery = ""
+        searchCursor = 0
         searchOnResults = false
         searchIndex = 0
         searchKey = 0
@@ -691,8 +699,9 @@ class HomeState(
         searchSound()
     }
 
-    fun updateSearch(text: String) {
+    fun updateSearch(text: String, cursor: Int = text.length) {
         searchQuery = text
+        searchCursor = cursor.coerceIn(0, text.length)
         searchIndex = 0
     }
 
@@ -708,9 +717,14 @@ class HomeState(
         val key = SearchKeyboardLayout.keysFor(searchDigits).getOrNull(index) ?: return
         when (key.action) {
             KeyAction.Letter ->
-                if (searchQuery.length < SearchMaxQuery) updateSearch(searchQuery + (SearchKeyboardLayout.charFor(index, searchDigits) ?: return).let { if (searchCaps) it.uppercaseChar() else it.lowercaseChar() })
-            KeyAction.Space -> if (searchQuery.isNotEmpty() && !searchQuery.endsWith(' ') && searchQuery.length < SearchMaxQuery) updateSearch("$searchQuery ")
-            KeyAction.Delete -> if (searchQuery.isNotEmpty()) updateSearch(searchQuery.dropLast(1))
+                if (searchQuery.length < SearchMaxQuery) {
+                    val c = (SearchKeyboardLayout.charFor(index, searchDigits) ?: return).let { if (searchCaps) it.uppercaseChar() else it.lowercaseChar() }
+                    updateSearch(searchQuery.insertAt(searchCursor, c), searchCursor + 1)
+                }
+            KeyAction.Space ->
+                if (searchQuery.length < SearchMaxQuery && spaceFits(searchQuery, searchCursor)) updateSearch(searchQuery.insertAt(searchCursor, ' '), searchCursor + 1)
+            KeyAction.Delete ->
+                if (searchCursor > 0) updateSearch(searchQuery.removeRange(searchCursor - 1, searchCursor), searchCursor - 1)
             KeyAction.Enter -> showSearchResults()
             KeyAction.Shift -> {
                 keySound()
@@ -753,11 +767,19 @@ class HomeState(
             Key.ButtonA, Key.Enter, Key.DirectionCenter -> pressSearchKey(searchKey)
             Key.ButtonX -> pressSearchKey(SearchKeyboardLayout.keysFor(searchDigits).indexOfFirst { it.action == KeyAction.Delete })
             Key.ButtonY -> pressSearchKey(SearchKeyboardLayout.keysFor(searchDigits).indexOfFirst { it.action == KeyAction.Space })
-            Key.ButtonL1 -> if (!isRepeat && !searchDigits) {
+            // L1 / R1 move the text cursor; L2 toggles the capitals, R2 the number pad.
+            Key.ButtonL1, Key.ButtonR1 -> {
+                val moved = (searchCursor + if (key == Key.ButtonL1) -1 else 1).coerceIn(0, searchQuery.length)
+                if (moved != searchCursor) {
+                    keySound()
+                    searchCursor = moved
+                }
+            }
+            Key.ButtonL2 -> if (!isRepeat && !searchDigits) {
                 keySound()
                 searchCaps = !searchCaps
             }
-            Key.ButtonR1 -> if (!isRepeat) {
+            Key.ButtonR2 -> if (!isRepeat) {
                 switchSound()
                 searchDigits = !searchDigits
                 searchKey = 0
@@ -1518,9 +1540,11 @@ class HomeState(
             // L1 / R1: straight to the first or the last game of the column.
             Key.ButtonL1, Key.ButtonR1 -> if (!isRepeat && platform != null && !held) {
                 val target = if (key == Key.ButtonL1) 0 else maxOf(rowCount(platform) - 1, 0)
+                // The page swipe sound, like turning a page; already on the first / last game it is silent.
                 if (target != gameIndex) {
                     gameIndexes[platform.id] = target
                     haptic()
+                    pageSound()
                 }
             }
             else -> return false
@@ -2060,11 +2084,21 @@ class HomeState(
             Key.ButtonA, Key.Enter, Key.DirectionCenter -> pressEntryKey(entryKey)
             Key.ButtonX -> pressEntryKey(SearchKeyboardLayout.keysFor(entryDigits).indexOfFirst { it.action == KeyAction.Delete })
             Key.ButtonY -> pressEntryKey(SearchKeyboardLayout.keysFor(entryDigits).indexOfFirst { it.action == KeyAction.Space })
-            Key.ButtonL1 -> if (!isRepeat && !entryDigits) {
+            // L1 / R1 move the text cursor (out of a selection: from its end); L2 toggles the capitals, R2 the number pad.
+            Key.ButtonL1, Key.ButtonR1 -> {
+                val from = if (entrySelected) entryText.length else entryCursor
+                val moved = (from + if (key == Key.ButtonL1) -1 else 1).coerceIn(0, entryText.length)
+                if (moved != entryCursor || entrySelected) {
+                    keySound()
+                    entrySelected = false
+                    entryCursor = moved
+                }
+            }
+            Key.ButtonL2 -> if (!isRepeat && !entryDigits) {
                 keySound()
                 entryCaps = !entryCaps
             }
-            Key.ButtonR1 -> if (!isRepeat) {
+            Key.ButtonR2 -> if (!isRepeat) {
                 switchSound()
                 entryDigits = !entryDigits
                 entryKey = 0
@@ -2083,16 +2117,26 @@ class HomeState(
         when (key.action) {
             KeyAction.Letter -> SearchKeyboardLayout.charFor(index, entryDigits)?.let(::typeEntry)
             KeyAction.Space ->
-                if (entryText.isNotEmpty() && !entryText.endsWith(' ') && entryText.length < EntryMaxLength) {
+                if (entrySelected) {
+                    // A space doesn't replace the selection: it just ends it, from the end of the text.
                     entrySelected = false
-                    entryText += " "
+                    entryCursor = entryText.length
+                    if (spaceFits(entryText, entryCursor) && entryText.length < EntryMaxLength) {
+                        entryText += " "
+                        entryCursor++
+                    }
+                } else if (spaceFits(entryText, entryCursor) && entryText.length < EntryMaxLength) {
+                    entryText = entryText.insertAt(entryCursor, ' ')
+                    entryCursor++
                 }
             KeyAction.Delete ->
                 if (entrySelected) {
                     entryText = ""
+                    entryCursor = 0
                     entrySelected = false
-                } else {
-                    entryText = entryText.dropLast(1)
+                } else if (entryCursor > 0) {
+                    entryText = entryText.removeRange(entryCursor - 1, entryCursor)
+                    entryCursor--
                 }
             KeyAction.Enter -> saveTitleEdit()
             KeyAction.Shift -> {
@@ -2106,12 +2150,20 @@ class HomeState(
     private fun typeEntry(c: Char) {
         if (entrySelected) {
             entryText = ""
+            entryCursor = 0
             entrySelected = false
         }
         if (entryText.length >= EntryMaxLength) return
-        val upper = c.isLetter() && (entryCaps || entryText.isEmpty() || entryText.endsWith(' '))
-        entryText += if (upper) c.uppercaseChar() else c.lowercaseChar()
+        val upper = c.isLetter() && (entryCaps || entryCursor == 0 || entryText[entryCursor - 1] == ' ')
+        entryText = entryText.insertAt(entryCursor, if (upper) c.uppercaseChar() else c.lowercaseChar())
+        entryCursor++
     }
+
+    private fun String.insertAt(index: Int, c: Char): String = substring(0, index) + c + substring(index)
+
+    /** A space goes in only between words: not at the start, and not next to another space. */
+    private fun spaceFits(text: String, at: Int): Boolean =
+        at > 0 && text[at - 1] != ' ' && (at == text.length || text[at] != ' ')
 
     /** A tap on a key of the title keyboard. */
     fun touchEntryKey(index: Int) {

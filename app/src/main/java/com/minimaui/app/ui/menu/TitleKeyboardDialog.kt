@@ -52,6 +52,7 @@ private const val CursorBlinkMillis = 500L
 fun TitleKeyboardDialog(
     heading: String,
     text: String,
+    cursor: Int,
     selected: Boolean,
     keyFocus: Int,
     caps: Boolean,
@@ -101,36 +102,7 @@ fun TitleKeyboardDialog(
                     .unfocusedOutline(outlineDepthFor(FieldHeight)),
                 contentAlignment = Alignment.Center
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                    Text(
-                        text = text,
-                        color = TextPrimary,
-                        fontSize = 33.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        softWrap = false,
-                        modifier = if (selected) Modifier.background(Color(0x40FFFFFF), RoundedCornerShape(8.dp)).padding(horizontal = 6.dp) else Modifier
-                    )
-                    // The text cursor is simply there or not (twice a second), still while the screen is dimmed.
-                    val dimmed = LocalDimmed.current
-                    var cursorOn by remember { mutableStateOf(true) }
-                    LaunchedEffect(dimmed) {
-                        cursorOn = true
-                        if (dimmed) return@LaunchedEffect
-                        while (true) {
-                            delay(CursorBlinkMillis)
-                            cursorOn = !cursorOn
-                        }
-                    }
-                    Box(
-                        Modifier
-                            .padding(start = 4.dp)
-                            .size(3.dp, 44.dp)
-                            .graphicsLayer { alpha = if (cursorOn && !selected) 1f else 0f }
-                            .background(TextPrimary)
-                    )
-                }
+                KeyboardFieldText(text, cursor, selected = selected)
             }
         }
 

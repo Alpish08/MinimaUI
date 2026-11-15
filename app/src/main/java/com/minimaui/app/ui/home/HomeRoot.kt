@@ -410,7 +410,9 @@ fun HomeRoot(
                     Key.ButtonR2 -> 1
                     else -> -1
                 }
-                if (trigger >= 0) {
+                // On an on-screen keyboard the triggers are its own keys (Caps and the number pad), not the search combo.
+                val onKeyboard = (state.searchOpen && !state.searchOnResults) || state.ownKeyboardEntry
+                if (trigger >= 0 && !onKeyboard) {
                     triggers[trigger] = event.type == KeyEventType.KeyDown
                     if (triggers[0] && triggers[1]) {
                         triggers.fill(false)
@@ -444,9 +446,10 @@ fun HomeRoot(
                                 // Confirming or cancelling a text entry (title, new folder, search field).
                                 typingBefore -> uiSounds.play(Sfx.CancelConfirm)
                                 // Pressing a key of the search keyboard has its own sound.
-                                // R1 switches between the letters and the number pad, with its own sound.
-                                keyboardBefore && (event.key == Key.ButtonR1 || event.key == Key.ButtonL1) -> Unit
-                                // Shift toggles the capitals with the keyboard sound (played by the state, so L1 gets it too).
+                                // L1 / R1 move the text cursor and L2 / R2 switch Caps and the number pad, each with its own sound.
+                                keyboardBefore && (event.key == Key.ButtonR1 || event.key == Key.ButtonL1 ||
+                                    event.key == Key.ButtonR2 || event.key == Key.ButtonL2) -> Unit
+                                // Shift toggles the capitals with the keyboard sound (played by the state, so L2 gets it too).
                                 keyboardBefore && onShiftBefore && (event.key == Key.ButtonA || event.key == Key.Enter || event.key == Key.DirectionCenter) -> Unit
                                 keyboardBefore && (event.key == Key.ButtonA || event.key == Key.Enter || event.key == Key.DirectionCenter ||
                                     event.key == Key.ButtonX || event.key == Key.ButtonY) -> uiSounds.play(Sfx.Keyboard)
@@ -776,6 +779,7 @@ fun HomeRoot(
             OverlayMotion(scrim = true) {
                 SearchDialog(
                     query = state.searchQuery,
+                    cursor = state.searchCursor,
                     results = state.searchHits.map { it.title },
                     selected = state.searchIndex,
                     onResults = state.searchOnResults,
@@ -841,6 +845,7 @@ fun HomeRoot(
                     TitleKeyboardDialog(
                         heading = entryStyle.value.second,
                         text = state.entryText,
+                        cursor = state.entryCursor,
                         selected = state.entrySelected,
                         keyFocus = state.entryKey,
                         caps = state.entryCaps,

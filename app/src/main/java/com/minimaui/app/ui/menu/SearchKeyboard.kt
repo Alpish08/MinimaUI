@@ -242,8 +242,9 @@ fun SearchKeyboard(
 
         ControlHintBar(
             hints = listOfNotNull(
-                if (!digits && caps != null) ControlHint("L", if (caps) "Caps On" else "Caps Off") else null,
-                ControlHint("R", if (digits) "ABC" else "123"),
+                ControlHint("L / R", "Cursor"),
+                if (!digits && caps != null) ControlHint("L2", if (caps) "Caps On" else "Caps Off") else null,
+                ControlHint("R2", if (digits) "ABC" else "123"),
             ) + listOf(ControlHint("Y", "Space"), ControlHint("X", "Delete"), ControlHint("START", "Enter"), ControlHint("B", "Cancel")),
             pill = false,
             fontSize = 24.sp,
@@ -289,3 +290,53 @@ private fun KeyPill(key: KbKey, label: String, active: Boolean, dim: Boolean, li
         }
     }
 }
+
+/**
+ * The text of a keyboard's field with its text cursor at [cursor] (0 = before the first character). The cursor is simply there
+ * or not (twice a second), shown again whenever it moves or the text changes, still while the screen is dimmed, and hidden
+ * while [caretShown] is false. [selected] shows the whole text selected (highlighted, no cursor).
+ */
+@Composable
+fun KeyboardFieldText(text: String, cursor: Int, selected: Boolean = false, caretShown: Boolean = true) {
+    val dimmed = com.minimaui.app.ui.components.LocalDimmed.current
+    var caretOn by remember { mutableStateOf(true) }
+    LaunchedEffect(dimmed, caretShown, cursor, text) {
+        caretOn = true
+        if (dimmed || !caretShown) return@LaunchedEffect
+        while (true) {
+            kotlinx.coroutines.delay(FieldCaretBlinkMillis)
+            caretOn = !caretOn
+        }
+    }
+    val at = cursor.coerceIn(0, text.length)
+    androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
+        if (selected) {
+            FieldText(text, Modifier.background(Color(0x40FFFFFF), RoundedCornerShape(8.dp)).padding(horizontal = 6.dp))
+        } else if (at > 0) {
+            FieldText(text.substring(0, at))
+        }
+        Box(
+            Modifier
+                .padding(horizontal = 2.dp)
+                .size(3.dp, 44.dp)
+                .graphicsLayer { alpha = if (caretOn && caretShown && !selected) 1f else 0f }
+                .background(TextPrimary)
+        )
+        if (!selected && at < text.length) FieldText(text.substring(at))
+    }
+}
+
+@Composable
+private fun FieldText(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        color = TextPrimary,
+        fontSize = 33.sp,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        softWrap = false,
+        modifier = modifier
+    )
+}
+
+private const val FieldCaretBlinkMillis = 500L
