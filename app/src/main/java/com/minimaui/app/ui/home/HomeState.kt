@@ -235,6 +235,9 @@ class HomeState(
         private set
     var entryCaps by mutableStateOf(false)
         private set
+    /** Typing with a finger: the key focus is still kept but not shown, until a button is used again. */
+    var entryTouchTyping by mutableStateOf(false)
+        private set
     /** Where the text cursor is in [entryText] (0 = before the first character), moved with L1 / R1. */
     var entryCursor by mutableIntStateOf(0)
         private set
@@ -246,6 +249,7 @@ class HomeState(
     private fun startEntry(initial: String) {
         entryText = initial
         entryCursor = initial.length
+        entryTouchTyping = false
         entrySelected = initial.isNotEmpty()
         entryKey = 0
         entryCaps = false
@@ -630,6 +634,9 @@ class HomeState(
         private set
     var searchQuery by mutableStateOf("")
         private set
+    /** Typing with a finger: the key focus is still kept but not shown, until a button is used again. */
+    var searchTouchTyping by mutableStateOf(false)
+        private set
     /** Where the text cursor is in [searchQuery] (0 = before the first character), moved with L1 / R1. */
     var searchCursor by mutableIntStateOf(0)
         private set
@@ -689,6 +696,7 @@ class HomeState(
         if (searchOpen || menuOpen || pickerOpen || detailsGame != null || isEditingTitle || editMode || moreOpen || folderPickerOpen) return
         searchQuery = ""
         searchCursor = 0
+        searchTouchTyping = false
         searchOnResults = false
         searchIndex = 0
         searchKey = 0
@@ -762,6 +770,7 @@ class HomeState(
 
     /** The on-screen keyboard: the D-pad moves between keys, A presses the focused one, X deletes, Y types a space, Start shows the results. */
     private fun onSearchKeyboardKey(key: Key, isRepeat: Boolean): Boolean {
+        searchTouchTyping = false
         when (key) {
             Key.ButtonB, Key.Escape -> if (!isRepeat) searchOpen = false
             Key.ButtonA, Key.Enter, Key.DirectionCenter -> pressSearchKey(searchKey)
@@ -1741,6 +1750,7 @@ class HomeState(
     fun touchSearchKey(index: Int) {
         if (!searchOpen || searchOnResults) return
         searchKey = index
+        searchTouchTyping = true
         if (SearchKeyboardLayout.keysFor(searchDigits).getOrNull(index)?.action != KeyAction.Shift) keySound()
         pressSearchKey(index)
     }
@@ -2079,6 +2089,7 @@ class HomeState(
     }
 
     private fun onEntryKey(key: Key, isRepeat: Boolean): Boolean {
+        entryTouchTyping = false
         when (key) {
             Key.ButtonB, Key.Escape -> if (!isRepeat) cancelTitleEdit()
             Key.ButtonA, Key.Enter, Key.DirectionCenter -> pressEntryKey(entryKey)
@@ -2169,6 +2180,7 @@ class HomeState(
     fun touchEntryKey(index: Int) {
         if (!ownKeyboardEntry) return
         entryKey = index
+        entryTouchTyping = true
         if (SearchKeyboardLayout.keysFor(entryDigits).getOrNull(index)?.action != KeyAction.Shift) keySound()
         pressEntryKey(index)
     }

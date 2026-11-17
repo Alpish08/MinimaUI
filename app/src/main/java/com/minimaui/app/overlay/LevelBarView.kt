@@ -64,9 +64,10 @@ class LevelBarView(context: Context) : View(context) {
             val panelH = above + top + barH + PANEL_PADDING * u
             panelShader.setFloatUniform("size", panelW, panelH)
             panelShader.setFloatUniform("radius", 44f * u)
-            panelShader.setFloatUniform("depth", 14f * u)
+            panelShader.setFloatUniform("depth", 24f * u)
             panelShader.setFloatUniform("above", above)
-            panelShader.setFloatUniform("fadeLength", (DROP + 136f) * u)
+            // The fade runs evenly down the whole panel, from solid black at the screen's edge to the full look at its bottom.
+            panelShader.setFloatUniform("fadeLength", panelH - above)
             canvas.save()
             canvas.translate(cx - panelW / 2f, -above)
             canvas.drawRect(0f, 0f, panelW, panelH, panel)
@@ -105,7 +106,7 @@ class LevelBarView(context: Context) : View(context) {
         const val PANEL_PADDING = 46f // bar to panel edge, on the left, right and bottom (design px)
         const val BACKGROUND_OUTLINE = 0.22f // BackgroundOutline in FadingOutline.kt
 
-        // The bubble panel: a 60% black fill with a white rim fading inward, going to solid black (no rim) over the first
+        // The bubble panel: a 60% black fill with a white rim fading inward, going evenly to solid black (no rim) over the first
         // [fadeLength] px below the top of the screen ([above] is how far the rect reaches over it).
         const val PANEL_AGSL = """
 uniform float2 size;
@@ -123,7 +124,6 @@ half4 main(float2 p) {
     float t = clamp(-outside / depth, 0.0, 1.0);
     float rim = 0.64 * (1.0 - t) * (1.0 - t);
     float f = clamp((p.y - above) / fadeLength, 0.0, 1.0);
-    f = f * f * (3.0 - 2.0 * f);
     float a = mix(1.0, rim + 0.6 * (1.0 - rim), f) * coverage;
     float white = rim * coverage * f;
     return half4(half3(white), half(a));

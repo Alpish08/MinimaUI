@@ -56,6 +56,8 @@ fun TitleKeyboardDialog(
     selected: Boolean,
     keyFocus: Int,
     caps: Boolean,
+    /** False while typing with a finger: the key focus is kept but not drawn. */
+    focusShown: Boolean = true,
     digits: Boolean,
     modifier: Modifier = Modifier,
     onTapKey: (Int) -> Unit = {},
@@ -108,7 +110,7 @@ fun TitleKeyboardDialog(
 
         SearchKeyboard(
             keyFocus,
-            active = true,
+            active = focusShown,
             enterReady = text.isNotBlank(),
             shown = { rise.value },
             digits = digits,

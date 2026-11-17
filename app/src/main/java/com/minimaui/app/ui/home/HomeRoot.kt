@@ -784,6 +784,7 @@ fun HomeRoot(
                     selected = state.searchIndex,
                     onResults = state.searchOnResults,
                     keyFocus = state.searchKey,
+                    focusShown = !state.searchTouchTyping,
                     digits = state.searchDigits,
                     caps = state.searchCaps,
                     hints = state.searchHints,
@@ -848,6 +849,7 @@ fun HomeRoot(
                         cursor = state.entryCursor,
                         selected = state.entrySelected,
                         keyFocus = state.entryKey,
+                        focusShown = !state.entryTouchTyping,
                         caps = state.entryCaps,
                         digits = state.entryDigits,
                         onTapKey = state::touchEntryKey

@@ -18,6 +18,17 @@ import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
@@ -101,28 +112,27 @@ fun GameTile(
                     .padding(1.5.dp)
                     .clip(RoundedCornerShape(tileSize.corner - 1.5.dp))
             )
+            // The cover blurs and darkens toward its bottom edge, under the title.
+            if (tileSize != TileSize.Small) CoverBottomBlur(it, tileSize, size, Modifier.align(Alignment.BottomCenter))
         }
         when (tileSize) {
-            TileSize.Large -> TitlePill(
+            TileSize.Large -> TileTitle(
                 title = title,
                 focused = focused,
+                hasCover = cover != null,
                 fontSize = 32.sp,
-                cover = cover,
-                tileSize = size,
-                pillSize = DpSize(416.dp, 71.dp),
-                bottomPadding = 72.dp,
-                trim = 20.dp,
-                modifier = Modifier.align(Alignment.BottomCenter).graphicsLayer { alpha = titleAlpha() }
+                width = size.width - TileSize.Large.corner * 2,
+                height = 56.dp,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 22.dp).graphicsLayer { alpha = titleAlpha() }
             )
-            TileSize.Medium -> TitlePill(
+            TileSize.Medium -> TileTitle(
                 title = title,
                 focused = focused,
+                hasCover = cover != null,
                 fontSize = 21.sp,
-                cover = cover,
-                tileSize = size,
-                pillSize = DpSize(246.dp, 48.dp),
-                bottomPadding = 37.dp,
-                modifier = Modifier.align(Alignment.BottomCenter).graphicsLayer { alpha = titleAlpha() }
+                width = size.width - TileSize.Medium.corner * 2,
+                height = 38.dp,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp).graphicsLayer { alpha = titleAlpha() }
             )
             TileSize.Small -> Unit
         }
@@ -130,70 +140,92 @@ fun GameTile(
 }
 
 /**
- * The title pill on a tile. It frosts whatever cover is behind it (the cover is drawn again inside the
- * pill, blurred and darkened) and has no outline unless it is focused, when it gets a white one.
+ * The bottom of the cover again, blurred and darkened, fading in from [CoverBlurReach] of the way up the tile to full at its
+ * bottom edge. Only that band is drawn and blurred (the cover's matching slice, plus the blur's reach above it for it to draw
+ * from), in one layer that also clips to the tile's rounded bottom corners, shades and fades it.
  */
 @Composable
-fun TitlePill(
-    title: String,
-    focused: Boolean,
-    fontSize: TextUnit,
-    cover: ImageBitmap?,
-    tileSize: DpSize,
-    pillSize: DpSize,
-    bottomPadding: Dp,
-    trim: Dp = 0.dp,
-    modifier: Modifier = Modifier,
-) {
-    // A short title gets a short pill (its text plus the same breathing room a scrolling title has); long ones keep the full width.
-    val density = LocalDensity.current
-    val sidePad = (pillSize.height + trim) * 0.7f
-    val textWidth = with(density) { rememberTextWidth(title, fontSize).toDp() }
-    val pillWidth = (textWidth + sidePad * 2 + 6.dp).coerceIn(minOf(pillSize.height * 2.5f, pillSize.width), pillSize.width)
-    val pillLeft = (tileSize.width - pillWidth) / 2
-    val pillTop = tileSize.height - bottomPadding - pillSize.height
-    val frosted = cover != null
+private fun CoverBottomBlur(cover: ImageBitmap, tileSize: TileSize, tile: DpSize, modifier: Modifier) {
+    val inset = 1.5.dp // as the cover: a hair inside the tile, so its edge stays under the border
+    val corner = tileSize.corner - inset
+    val blur = if (tileSize == TileSize.Large) 32.dp else 20.dp
+    val innerHeight = tile.height - inset * 2
+    val ramp = innerHeight * CoverBlurReach
+    val band = ramp + blur
+    val shape = RoundedCornerShape(bottomStart = corner, bottomEnd = corner)
     Box(
-        modifier = modifier
-            .padding(bottom = bottomPadding)
-            .size(pillWidth, pillSize.height)
-            .clip(CircleShape)
-            .background(if (cover == null) Color(0x33000000) else Color.Transparent),
-        contentAlignment = Alignment.Center
+        modifier
+            .padding(start = inset, end = inset, bottom = inset)
+            .fillMaxWidth()
+            .height(band)
+            .graphicsLayer {
+                compositingStrategy = CompositingStrategy.Offscreen
+                this.shape = shape
+                clip = true
+            }
+            .drawWithContent {
+                drawContent()
+                drawRect(Color.Black.copy(alpha = CoverBlurShade))
+                // Nothing over the blur's extra reach, then a smooth ramp (eased at both ends) so the blur has no start line.
+                val top = blur.toPx() / size.height
+                val at = { share: Float -> top + (1f - top) * share }
+                drawRect(
+                    Brush.verticalGradient(
+                        0f to Color.Transparent,
+                        top to Color.Transparent,
+                        at(0.45f) to Color.Black.copy(alpha = 0.6f),
+                        at(0.75f) to Color.Black,
+                        1f to Color.Black,
+                    ),
+                    blendMode = BlendMode.DstIn
+                )
+            }
     ) {
-        if (frosted) {
-            Image(
-                bitmap = cover!!,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .placeAt(-pillLeft, -pillTop, tileSize.width, tileSize.height)
-                    .blur(BlurRadius, BlurredEdgeTreatment.Unbounded)
-            )
-            Box(Modifier.matchParentSize().background(PillScrim))
-        }
+        Spacer(
+            Modifier
+                .matchParentSize()
+                .blur(blur, BlurredEdgeTreatment.Rectangle)
+                .drawBehind {
+                    // The slice of the cover (cropped to the tile like the cover itself) that lies under this band.
+                    val fullHeight = innerHeight.toPx()
+                    val scale = maxOf(size.width / cover.width, fullHeight / cover.height)
+                    val srcWidth = size.width / scale
+                    val srcLeft = (cover.width - srcWidth) / 2f
+                    val srcTop = (cover.height - fullHeight / scale) / 2f + (fullHeight - size.height) / scale
+                    drawImage(
+                        cover,
+                        srcOffset = IntOffset(srcLeft.toInt(), srcTop.toInt().coerceAtLeast(0)),
+                        srcSize = IntSize(srcWidth.toInt(), (size.height / scale).toInt().coerceAtLeast(1)),
+                        dstSize = IntSize(size.width.toInt(), size.height.toInt()),
+                        filterQuality = FilterQuality.Low
+                    )
+                }
+        )
+    }
+}
+
+/**
+ * A tile's title, on the blurred bottom of its cover: [width] wide (the tile less its rounded corners), so a long title only
+ * fades out near the tile's sides. The focused one scrolls; the others end in "…".
+ */
+@Composable
+private fun TileTitle(title: String, focused: Boolean, hasCover: Boolean, fontSize: TextUnit, width: Dp, height: Dp, modifier: Modifier) {
+    Box(modifier.size(width, height), contentAlignment = Alignment.Center) {
         MarqueeText(
             text = title,
             color = when {
                 focused -> TextPrimary
-                cover != null -> TextPrimary.copy(alpha = 0.85f)
+                hasCover -> TextPrimary.copy(alpha = 0.85f)
                 else -> TextDim
             },
             fontSize = fontSize,
             scrolling = focused,
-            startIndent = (pillSize.height + trim) * 0.7f,
-            endIndent = (pillSize.height + trim) * 0.45f,
+            startIndent = 12.dp,
+            endIndent = 12.dp,
             centerWhenFits = true
         )
     }
 }
 
-private val BlurRadius = 18.dp
-private val PillScrim = Color(0x66000000)
-
-/** Places the child at a fixed size and offset inside its parent, letting it overflow (the parent clips). */
-private fun Modifier.placeAt(offsetX: Dp, offsetY: Dp, width: Dp, height: Dp): Modifier =
-    layout { measurable, constraints ->
-        val placeable = measurable.measure(Constraints.fixed(width.roundToPx(), height.roundToPx()))
-        layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(offsetX.roundToPx(), offsetY.roundToPx()) }
-    }
+private const val CoverBlurReach = 0.36f // how far up the tile the blur reaches (a share of its height)
+private const val CoverBlurShade = 0.55f // how much the blurred band is darkened, at the bottom

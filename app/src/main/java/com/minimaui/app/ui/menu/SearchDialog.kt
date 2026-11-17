@@ -92,6 +92,8 @@ fun SearchDialog(
     onResults: Boolean,
     keyFocus: Int,
     digits: Boolean,
+    /** False while typing with a finger: the key focus is kept but not drawn. */
+    focusShown: Boolean = true,
     caps: Boolean,
     hints: List<ControlHint>,
     modifier: Modifier = Modifier,
@@ -271,7 +273,7 @@ fun SearchDialog(
 
         SearchKeyboard(
             keyFocus,
-            active = !onResults,
+            active = !onResults && focusShown,
             enterReady = results.isNotEmpty(),
             shown = { keyboardShown.value },
             digits = digits,

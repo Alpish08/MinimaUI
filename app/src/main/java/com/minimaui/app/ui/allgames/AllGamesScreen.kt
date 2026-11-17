@@ -73,6 +73,7 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.launch
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.unit.Constraints
@@ -654,7 +655,9 @@ private fun Modifier.fadeContent(on: Boolean, mask: androidx.compose.ui.graphics
             drawRect(brush, topLeft = rect.topLeft, size = rect.size, blendMode = BlendMode.DstOut)
         }
 
-private const val ListFadeTop = 930f // the fade to black under the list starts here and is solid at the screen's bottom
+private const val ListFadeTop = 1000f
+private const val JumpRows = 3f // a jump of more rows than this swipes in from this many rows away
+private const val JumpFadeLow = 0.25f // the fade to black under the list starts here and is solid at the screen's bottom
 private const val CoverDecodePx = 340
 
 // The cover's outline is white at the very edge and fades to nothing this far (at full size) toward the inside.
@@ -783,14 +786,30 @@ private fun GameColumn(
     val context = androidx.compose.ui.platform.LocalContext.current
     androidx.compose.runtime.LaunchedEffect(games, selected, isCurrent) {
         val window = if (isCurrent) (selected - 2).coerceAtLeast(0)..(selected + 8) else 0..4
-        for (i in window) games.getOrNull(i)?.let { com.minimaui.app.ui.components.prefetchCover(context, it.xmbCoverUri, CoverDecodePx) }
+        // L1 / R1 jump to the first or last game, so those ends are ready too.
+        val ends = if (isCurrent) (0..4) + ((games.size - 5).coerceAtLeast(0) until games.size) else emptyList()
+        for (i in window + ends) games.getOrNull(i)?.let { com.minimaui.app.ui.components.prefetchCover(context, it.xmbCoverUri, CoverDecodePx) }
     }
-    val listPosition = animateFloatAsState(
-        targetValue = selected.toFloat(),
-        animationSpec = GlideSpring,
-        visibilityThreshold = GlideThreshold,
-        label = "listPosition"
-    )
+    // Steps glide there; a jump (L1 / R1 to the first or last game) is a quick page swipe instead: the list drops to a faint
+    // copy a few rows short of the target and glides the rest of the way while it fades back in.
+    val glide = remember { androidx.compose.animation.core.Animatable(selected.toFloat(), GlideThreshold) }
+    val jumpFade = remember { androidx.compose.animation.core.Animatable(1f) }
+    androidx.compose.runtime.LaunchedEffect(selected) {
+        val target = selected.toFloat()
+        if (abs(target - glide.targetValue) > JumpRows) {
+            kotlinx.coroutines.coroutineScope {
+                launch {
+                    jumpFade.snapTo(JumpFadeLow)
+                    jumpFade.animateTo(1f, tween(300, easing = EaseInOut))
+                }
+                glide.snapTo(target - JumpRows * kotlin.math.sign(target - glide.value))
+                glide.animateTo(target, GlideSpring)
+            }
+        } else {
+            glide.animateTo(target, GlideSpring)
+        }
+    }
+    val listPosition = glide.asState()
     // 1 when this column's platform is the selected one, fading to 0 a full step away.
     val columnAlpha = { (1f - abs(index - platformPosition.value)).coerceIn(0f, 1f) }
     val rows = games.size + if (showPlus) 1 else 0
@@ -801,6 +820,7 @@ private fun GameColumn(
             .offset {
                 IntOffset((tileCenter(widths, platformPosition.value, index) - ListCenterX).dp.roundToPx(), 0)
             }
+            .graphicsLayer { alpha = jumpFade.value }
     ) {
         // The glow behind the focused title pill: faint and steady (the blinking belongs to the cover), and faded toward
         // the pill's left end the way the pill is, so no haze shows in its faded region. It glides when the pill changes length.

@@ -481,7 +481,7 @@ private fun FocusBrackets(slot: BentoSlot, held: Boolean, originX: Float, origin
 
 /** How far from the panel's side edges the covers fade out while the pages slide (nothing fades at rest). */
 private const val EdgeFadeAtRest = 40f
-private const val EdgeFadeMoving = 260f
+private const val EdgeFadeMoving = 59f // the gap between the outer covers and the panel's edge
 private const val SwipeDistance = 100f
 private const val EditEdgeZone = 90f
 
