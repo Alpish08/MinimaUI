@@ -94,12 +94,12 @@ MinimaUI does not include any games, BIOS files, emulators or artwork of the pla
 | **M1 / M2** | send a ripple through the wave |
 
 The **Start menu** has four pages:
-* **Edit Current Game** (or Platform / App): title, cover image, favorite, folder, custom emulator and remove from library (for a platform: icon, title and default emulator, and a second page listing the hidden games).
+* **Edit Current Game** (or Platform / App): title, cover image (**X** on it goes back to the original), favorite, folder, custom emulator and remove from library (for a platform: icon, title and default emulator, and a second page listing the hidden games).
 * **Customization**: XMB wave, touch, **Edit Mode**, UI smoothness (60 / 120 Hz), **Boot Animation**, **Idle Clock**, sounds, music and volume, and (in Edit Mode on All Games or Favorites) which platforms are shown.
 * **ROMs Folder(s)**: your ROM folders (**X** removes one, **Y** rescans).
 * **Backup / Restore**: save and restore all settings.
 
-The keyboard: **A** types, **X** deletes, **Y** is space, **Start** is Enter, **L** is Caps (or the Shift key), **R** switches between the letters and the number pad, **B** cancels.
+The keyboard: **A** types, **X** deletes (the character before the text cursor), **Y** is space, **Start** is Enter, **L1 / R1** move the text cursor, **L2** is Caps (or the Shift key), **R2** switches between the letters and the number pad, **B** cancels. Typing on the touch screen hides the key focus until you press a button again.
 
 # The MinimaUI folder
 MinimaUI creates these folders on internal storage (`/sdcard/MinimaUI/`) itself the first time it runs with *All files access*:
