@@ -27,11 +27,11 @@ No -
 When nothing has been touched for 30 seconds the focus glow and the scrolling titles stop, the wave stops, the screen dims and an analog clock fades in (with the Idle Clock turned off it just dims, to 20% of your brightness instead of 40%); the first button press only wakes it.
 
 # Features
-* **Favorites**: a bento of your favorite games and apps, with folders and a recently played view.
+* **Favorites**: a bento of your favorite games and apps, with folders and a recently played view. Its nine-dot tile opens the launcher menu, a 3x3 grid that grows out of the tile: folders, recently played, a random game, the menu, Apps, search, Edit Mode (the pen), and your gallery and music apps (Aves and Auxio for now).
 * **All Games**: an XMB-style row of platforms with a column of covers under each one (16:9 covers).
 * **Apps**: your apps in pages, separate from the games, placed in any slot you like, with Vita-style bubble folders (see [Apps and folders](#apps-and-folders)).
 * **Search** (L2 + R2): type with MinimaUI's own on-screen keyboard (letters and a number pad), or with the touch screen.
-* **Edit Mode** (from the Customization menu, or hold a cover or an app icon, or hold **Select** on one): rearrange favorites, platforms and apps; remove games from the library (and bring them back from the *Hidden Games* page of *Edit Current Platform*, in Edit Mode on All Games).
+* **Edit Mode** (from the Customization menu, the pen in the launcher menu, holding an app icon or a game on All Games, or holding **Select** on one): rearrange favorites, platforms and apps; remove games from the library (and bring them back from the *Hidden Games* page of *Edit Current Platform*, in Edit Mode on All Games).
 * **Per-game and per-platform emulators**: pick any installed app as the emulator, or go back to the original.
 * **Platform tiles** show the platform's logo from `MinimaUI/Platform Icons/` when it has one (named like the console, e.g. `Sony Playstation.png`), otherwise its name as text; give a platform its own title or image if you like. A platform shows on All Games while it has games (Android and Steam always); switch any platform on or off by hand in Customization (in Edit Mode on All Games or Favorites).
 * An optional animated XMB wave with its own blur and brightness on each page, background music, UI sounds, your own boot animation, settings backups, and an ambient clock.
@@ -118,7 +118,7 @@ MinimaUI/
 ```
 
 **Sounds**: drop files named like these in `Sounds/` (`.wav`, `.ogg`, `.mp3` or `.m4a`); any that are missing fall back to Android's click:
-`navigation`, `settings_menu_navigation`, `menu`, `edit_mode`, `error`, `page_switch`, `app_launch`, `game_launch`, `app_exit`, `game_exit`, `cancel_confirm`, `keyboard`, `toast_menu`, `mode_switch`. `settings_menu_navigation` is for opening the settings menu and the search and for switching between Favorites, All Games and Apps, `menu` for opening the launcher (nine-dot) menu (falls back to `settings_menu_navigation`), `edit_mode` for entering Edit Mode and `error` for a game that won't launch or a failed backup (both silent when missing), `mode_switch` for the keyboard's ABC / 123 switch, and `cancel_confirm` for choosing an item in a menu.
+`navigation`, `settings_menu_navigation`, `menu`, `edit_mode`, `error`, `page_switch`, `app_launch`, `game_launch`, `app_exit`, `game_exit`, `cancel_confirm`, `keyboard`, `toast_menu`, `mode_switch`. `settings_menu_navigation` is for opening the settings menu and the search and for switching between Favorites, All Games and Apps, `menu` for opening the launcher (nine-dot) menu (falls back to `settings_menu_navigation`), `edit_mode` for entering Edit Mode and `error` for a game that won't launch or a failed backup (both silent when missing), `mode_switch` for the keyboard's ABC / 123 switch, and `cancel_confirm` for choosing an item in a menu and for opening an Apps folder.
 
 Sounds are not included. If you want a PS Vita feel, the community-made [PS Vita SFX pack on DeckThemes](https://deckthemes.com/packs/view?themeId=9dab732c-e05c-4f4b-a6b4-c648a8c144d3) has the system sounds, including ones MinimaUI doesn't use. Its files are named differently from the list above, so listen to them, pick the ones you like, copy them into `Sounds/` and rename each one to the name MinimaUI expects. That pack is made by someone else and I'm not affiliated with it or with Sony; the sounds belong to their owners, so use them for your own device only.
 
@@ -139,7 +139,7 @@ Apps and folders sit in any slot of the Apps page (rows of 3, 4 and 3); gaps sta
 * **X** takes an app off the page, deletes a folder (its apps go back to the page) or, inside a folder, moves an app back to the page.
 * **Y** opens a folder.
 
-**Folders** are bubbles that show the apps inside in small. Make and fill them from the Start menu: *Edit Current App → Add To Folder* (pick a folder, or **+** for a new one named with the on-screen keyboard; it takes the app's place). In a folder the entry is *Remove From Folder*; on a bubble the menu offers *Rename Folder* and *Delete Folder*. A folder holds ten apps, in the same layout. **A** opens it, **B** (or a tap outside) closes it.
+**Folders** are bubbles that show the apps inside in small. Make and fill them from the Start menu: *Edit Current App → Add To Folder* (pick a folder, or **+** for a new one named with the on-screen keyboard; it takes the app's place). In a folder the entry is *Remove From Folder*; on a bubble the menu offers *Rename Folder* and *Delete Folder*. A folder holds ten apps, in the same layout. **A** opens it (the bubble stretches into the folder, its apps growing out of their small places), **B** (or a tap outside) closes it.
 
 # The wave
 The first time you run MinimaUI the XMB wave is on, in the author's own look. *Start → Customization → XMB Wave* switches it between OFF, ORIGINAL (the original wave) and CUSTOM (the MinimaUI wave).
