@@ -48,13 +48,24 @@ object BentoLayouts {
         BentoSlot(1289.dp, 445.dp, 344.dp, 344.dp, TileSize.Medium),
     )
 
-    /** The Apps page: 212dp round icons in rows of 3, 4 and 3 (screen coordinates, top-left corners), 367 apart across (12 more than the 355 it had). */
-    val Apps: List<BentoSlot> = listOf(
-        593f to 272f, 960f to 272f, 1327f to 272f,
-        409.5f to 535f, 776.5f to 535f, 1143.5f to 535f, 1510.5f to 535f,
-        593f to 798f, 960f to 798f, 1327f to 798f,
-    ).map { (cx, cy) -> BentoSlot((cx - 106f).dp, (cy - 106f).dp, 212.dp, 212.dp, TileSize.Medium) }
+    /** The Apps page: 212dp round icons in rows of 3, 4 and 3 (screen coordinates, top-left corners), [AppsPitch] apart across. */
+    val Apps: List<BentoSlot> = appsLayout(AppsPitch)
+
+    /** An open folder's slots (before it is scaled into the panel): the same rows, closer together ([AppsFolderPitch]). */
+    val AppsFolder: List<BentoSlot> = appsLayout(AppsFolderPitch)
 }
+
+private fun appsLayout(pitch: Float): List<BentoSlot> = listOf(
+    960f - pitch to 272f, 960f to 272f, 960f + pitch to 272f,
+    960f - 1.5f * pitch to 535f, 960f - 0.5f * pitch to 535f, 960f + 0.5f * pitch to 535f, 960f + 1.5f * pitch to 535f,
+    960f - pitch to 798f, 960f to 798f, 960f + pitch to 798f,
+).map { (cx, cy) -> BentoSlot((cx - 106f).dp, (cy - 106f).dp, 212.dp, 212.dp, TileSize.Medium) }
+
+/** Between neighbouring icons across in an open folder (the page's spacing before it grew to [AppsPitch]). */
+const val AppsFolderPitch = 367f
+
+/** Between neighbouring Apps icons across: a 178 gap between the 212 icons (15% more than the 155 it had, closer to the Vita's spacing). */
+const val AppsPitch = 390f
 
 /**
  * Picks the slot to move to from [from] in [direction], among the slots [allowed] says can be focused:

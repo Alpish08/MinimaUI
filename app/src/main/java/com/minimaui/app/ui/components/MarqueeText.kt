@@ -77,6 +77,8 @@ fun MarqueeText(
         // One round: the text and a third of the width (the marquee's gap) at its pace, then the pause. Whole rounds that fit in ScrollSeconds.
         val roundMillis = (naturalWidth + constraints.maxWidth / 3f) / with(density) { ScrollVelocity.toPx() } * 1000f + ScrollRepeatDelayMillis
         val rounds = (ScrollSeconds * 1000f / roundMillis).toInt().coerceIn(1, ScrollLoops)
+        // The left fade eases in (the text there doesn't change), but the right one is there at once: a scrolling title is laid
+        // out at its full length, so its clipped right end would otherwise show hard-cut while the fade grew in.
         val fade by animateFloatAsState(if (scroll) 1f else 0f, tween(250), label = "marqueeFade")
         // One round is the text (with its indents) and a gap of a third of the width; the offset is read only in the draw.
         val loopPx = naturalWidth + with(density) { (startIndent + endIndent).toPx() } + constraints.maxWidth / 3f
@@ -104,8 +106,9 @@ fun MarqueeText(
             }
         }
         val indent = if (centerWhenFits && !overflows) Modifier else Modifier.padding(start = startIndent, end = endIndent)
+        val room = constraints.maxWidth - with(density) { (startIndent + endIndent).toPx() }
         Text(
-            text = text,
+            text = if (!scrolling && overflows) rememberShortened(text, fontSize, room) else text,
             color = color,
             fontWeight = FontWeight.Bold,
             fontSize = fontSize,
@@ -114,7 +117,7 @@ fun MarqueeText(
             textAlign = textAlign,
             overflow = if (scrolling) TextOverflow.Clip else TextOverflow.Ellipsis,
             modifier = Modifier
-                .then(if (fade > 0f) Modifier.fadingEdges(EdgeFade * fade) else Modifier)
+                .then(if (scroll || fade > 0f) Modifier.fadingEdges(EdgeFade * fade, if (scroll) EdgeFade else EdgeFade * fade) else Modifier)
                 .then(if (scroll) Modifier.slowMarquee({ offset.floatValue }, loopPx) else Modifier)
                 .then(indent)
         )
@@ -129,6 +132,27 @@ fun rememberTextWidth(text: String, fontSize: TextUnit): Int {
     val style = LocalTextStyle.current.merge(TextStyle(fontSize = fontSize, fontWeight = FontWeight.Bold))
     return remember(text, style, density) { measurer.measure(text, style, softWrap = false, maxLines = 1).size.width }
 }
+
+/** A title too long for [room] px cut short to end in a midline ellipsis (⋯, dots at the letters' middle height) instead of "…". */
+@Composable
+private fun rememberShortened(text: String, fontSize: TextUnit, room: Float): String {
+    val density = LocalDensity.current
+    val measurer = rememberTextMeasurer()
+    val style = LocalTextStyle.current.merge(TextStyle(fontSize = fontSize, fontWeight = FontWeight.Bold))
+    return remember(text, style, density, room) {
+        fun width(s: String) = measurer.measure(s, style, softWrap = false, maxLines = 1).size.width
+        // The longest start of the title that still fits with the ellipsis (a binary search, once per title and width).
+        var lo = 0
+        var hi = text.length
+        while (lo < hi) {
+            val mid = (lo + hi + 1) / 2
+            if (width(text.take(mid).trimEnd() + Ellipsis) <= room) lo = mid else hi = mid - 1
+        }
+        text.take(lo).trimEnd() + Ellipsis
+    }
+}
+
+private const val Ellipsis = "\u22EF"
 
 /**
  * Shows the content (measured as wide as it likes) moved [offset] px to the left, clipped to the space it has, with a second
@@ -152,18 +176,19 @@ private fun Modifier.slowMarquee(offset: () -> Float, loopPx: Float): Modifier =
         drawContext.transform.translate(x, 0f)
     }
 
-/** Fades the content out toward its left and right edges over [width]. */
-private fun Modifier.fadingEdges(width: Dp): Modifier = this
+/** Fades the content out toward its left edge over [start] and its right edge over [end]. */
+private fun Modifier.fadingEdges(start: Dp, end: Dp): Modifier = this
     .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
     .drawWithContent {
         drawContent()
-        val fraction = (width.toPx() / size.width).coerceIn(0f, 0.5f)
+        val left = (start.toPx() / size.width).coerceIn(0f, 0.5f)
+        val right = (end.toPx() / size.width).coerceIn(0f, 0.5f)
         drawRect(
             Brush.horizontalGradient(
-                0f to Color.Transparent,
-                fraction to Color.Black,
-                1f - fraction to Color.Black,
-                1f to Color.Transparent
+                0f to (if (left > 0f) Color.Transparent else Color.Black),
+                left to Color.Black,
+                1f - right to Color.Black,
+                1f to (if (right > 0f) Color.Transparent else Color.Black)
             ),
             blendMode = BlendMode.DstIn
         )

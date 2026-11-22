@@ -25,6 +25,7 @@ import com.minimaui.app.ui.components.EaseInOut
 import com.minimaui.app.ui.components.progressiveBlur
 import com.minimaui.app.ui.components.rememberPressScale
 import androidx.compose.animation.core.tween
+import kotlinx.coroutines.flow.first
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -37,6 +38,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.minimaui.app.ui.components.FocusedOutlineGain
 import com.minimaui.app.ui.components.UnfocusedOutline
+import com.minimaui.app.ui.components.drawFadingOutline
+import com.minimaui.app.ui.components.BackgroundOutline
 import com.minimaui.app.ui.components.softOutline
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -77,6 +80,7 @@ import com.minimaui.app.ui.components.WaveOriginal
 import com.minimaui.app.ui.components.XmbWave
 import com.minimaui.app.ui.components.rememberCover
 import com.minimaui.app.ui.favorites.BentoLayouts
+import com.minimaui.app.ui.favorites.AppsFolderPitch
 import com.minimaui.app.ui.theme.Dimens
 import com.minimaui.app.ui.theme.TextPrimary
 
@@ -132,6 +136,16 @@ fun AppsScreen(
     val opening by remember { androidx.compose.runtime.derivedStateOf { open.value > 0f } }
     if (folder == null && !opening && preparedFolder != null) origin[0] = slot
     LaunchedEffect(folderOpen) { open.animateTo(if (folderOpen) 1f else 0f, FolderOpenMotion.spec(closing = !folderOpen)) }
+    // The page's focus goes at once when a folder opens, and fades back in only once it has closed all the way.
+    val focusBack = remember { androidx.compose.animation.core.Animatable(if (folderOpen) 0f else 1f) }
+    LaunchedEffect(folderOpen) {
+        if (folderOpen) {
+            focusBack.snapTo(0f)
+        } else if (focusBack.value < 1f) {
+            androidx.compose.runtime.snapshotFlow { open.value }.first { it == 0f }
+            focusBack.animateTo(1f, tween(FocusBackMillis, easing = EaseInOut))
+        }
+    }
     val currentFolderOpen by androidx.compose.runtime.rememberUpdatedState(folderOpen)
     val currentPageTiles by androidx.compose.runtime.rememberUpdatedState(pageTiles(page))
     val currentFolderTiles by androidx.compose.runtime.rememberUpdatedState(folderTiles)
@@ -143,7 +157,7 @@ fun AppsScreen(
             x = FolderCenterX + (x - FolderCenterX) / FolderLayoutScale
             y = PageLayoutCenterY + (y - FolderCenterY) / FolderLayoutScale
         }
-        return BentoLayouts.Apps.indexOfFirst { slot ->
+        return (if (currentFolderOpen) BentoLayouts.AppsFolder else BentoLayouts.Apps).indexOfFirst { slot ->
             val dx = x - (slot.x.value + slot.width.value / 2f)
             val dy = y - (slot.y.value + slot.height.value / 2f)
             dx * dx + dy * dy <= TapRadius * TapRadius
@@ -196,12 +210,13 @@ fun AppsScreen(
     ) {
         // The same wave as behind All Games, a little blurred and dimmer so the icons stay in front.
         XmbWave(style = wave, soft = { 3f }, brightness = { AppsWaveBrightness * (1f - 0.65f * open.value) }, modifier = Modifier.fillMaxSize())
-        // Opening a folder zooms into its bubble: the page grows a little around it, moving the other icons aside, while
-        // they quickly fade and blur away (see FolderOpenMotion).
+        // Opening a folder zooms into its bubble: the page grows around it, pushing the other icons out past the screen's
+        // edges (fading out toward them), while they fade away (see FolderOpenMotion).
         val bubble = BentoLayouts.Apps.getOrNull(origin[0]) ?: BentoLayouts.Apps[0]
         Box(
             Modifier
                 .fillMaxSize()
+                .edgeFade { (open.value / FolderOpenMotion.FadeEnd).coerceIn(0f, 1f) }
                 .graphicsLayer {
                     val t = open.value
                     val zoom = FolderOpenMotion.zoom(t, closing = !folderOpen)
@@ -234,10 +249,14 @@ fun AppsScreen(
                         pressTick = pressTick,
                         backdrop = ribbon,
                         arrival = LocalArrival.current,
-                        // The opening folder's own bubble hands over to the panel growing out of it (else it would zoom
-                        // up behind the see-through panel too); closing, it comes back with the page, as the panel shrinks into it.
-                        fadedSlot = if (shownPage == page && folderOpen) origin[0] else -1,
-                        fadedAlpha = { 1f - (open.value / 0.3f).coerceIn(0f, 1f) },
+                        // The opening folder's own bubble becomes the panel (which starts as the same bubble and stretches
+                        // into the panel's shape); closing, the panel shrinks back into the bubble's shape and hands over to it.
+                        fadedSlot = if (shownPage == page && (folderOpen || opening)) origin[0] else -1,
+                        // The bubble's focus goes with it at once (else it would linger around the empty place).
+                        focusAlpha = { focusBack.value },
+                        // The ring goes into the panel (which carries it as it stretches) and is back as soon as it has shrunk.
+                        ringAlpha = { if (open.value > 0f || folderOpen) 0f else 1f },
+                        fadedAlpha = { if (open.value > 0f) 0f else 1f },
                     )
                 }
             }
@@ -306,39 +325,39 @@ private fun FolderPanel(
     pressTick: Int,
 ) {
     val from = BentoLayouts.Apps.getOrNull(originSlot) ?: BentoLayouts.Apps[0]
-    val shape = RoundedCornerShape(FolderCorner.dp)
-    Box(
-        Modifier
-            .fillMaxSize()
-            .folderGrowth(from, progress, closing = !opening && !prepared) { t ->
-                // Opening, it comes in while the page is still fading (no empty moment); closing, it fades as it shrinks back
-                // and is gone before the page's icons come back, so its outline never lies over them.
-                if (opening) ((t - FolderPanelInOpening) / 0.3f).coerceIn(0f, 1f) else ((t - FolderPanelOut) / 0.4f).coerceIn(0f, 1f)
-            }
-    ) {
-        Box(
-            Modifier
-                .offset((FolderCenterX - FolderWidth / 2f).dp, (FolderCenterY - FolderHeight / 2f).dp)
-                .size(FolderWidth.dp, FolderHeight.dp)
-                .clip(shape)
-                .background(FolderPanelFill)
-                .backgroundOutline(depth = FolderOutlineDepth, corner = FolderCorner.dp)
-        )
+    val closing = !opening && !prepared
+    // 0: the folder's bubble (with its apps small inside), 1: the open panel; eased both ways.
+    val morph = { if (prepared) 1f else folderMorph(progress(), closing) }
+    val shown = { if (prepared) FolderWarmAlpha else if (progress() > 0f) 1f else 0f }
+    Box(Modifier.fillMaxSize().graphicsLayer { alpha = shown() }) {
+        val pulse = com.minimaui.app.ui.components.LocalFocusPulse.current
+        // The focused bubble's ring stretches with it and fades out (opening), or fades in as it shrinks back (closing).
+        val ring = { e: Float -> if (prepared) 0f else (1f - e / 0.5f).coerceIn(0f, 1f) * pulse() }
+        Box(Modifier.morphingPanel(from, morph, ring))
     }
-    // The name and the slots come in once the panel has mostly grown, moving and growing out of the bubble with it.
+    // The name and the slots: the apps grow out of their small places in the bubble into their slots as the panel stretches,
+    // kept inside its shape until it is open.
     Box(
-        Modifier.fillMaxSize().folderGrowth(from, progress, closing = !opening && !prepared) { t ->
-            when {
-                // Ready behind a focused bubble: drawn faintly enough not to show, so its icons are already on the GPU when it opens.
-                prepared -> FolderWarmAlpha
-                opening -> ((t - FolderPanelInOpening - 0.05f) / 0.4f).coerceIn(0f, 1f)
-                // Closing, they start fading at once (B answers right away), ahead of the panel.
-                else -> ((t - FolderContentsOut) / (1f - FolderContentsOut)).coerceIn(0f, 1f)
+        Modifier.fillMaxSize().graphicsLayer {
+            alpha = shown()
+            val e = morph()
+            if (e < 1f) {
+                val r = morphRect(from, e)
+                clip = true
+                shape = object : androidx.compose.ui.graphics.Shape {
+                    override fun createOutline(size: androidx.compose.ui.geometry.Size, layoutDirection: androidx.compose.ui.unit.LayoutDirection, density: androidx.compose.ui.unit.Density) =
+                        androidx.compose.ui.graphics.Outline.Rounded(
+                            androidx.compose.ui.geometry.RoundRect(
+                                r.left * density.density, r.top * density.density, r.right * density.density, r.bottom * density.density,
+                                androidx.compose.ui.geometry.CornerRadius(r.height / 2f * density.density)
+                            )
+                        )
+                }
             }
         }
     ) {
         Box(
-            Modifier.offset(0.dp, (FolderTitleY - 30f).dp).size(Dimens.DesignWidth.dp, 60.dp),
+            Modifier.offset(0.dp, (FolderTitleY - 30f).dp).size(Dimens.DesignWidth.dp, 60.dp).graphicsLayer { alpha = lateFade(morph()) },
             contentAlignment = Alignment.Center
         ) {
             androidx.compose.material3.Text(
@@ -360,34 +379,112 @@ private fun FolderPanel(
                     translationY = (FolderCenterY - PageLayoutCenterY) * density
                 }
         ) {
-            TileGrid(tiles = tiles, focusedSlot = focusedSlot, editMode = editMode, held = held, pressTick = pressTick, backdrop = false, arrival = { 1f })
+            androidx.compose.runtime.CompositionLocalProvider(LocalLabelFade provides { lateFade(morph()) }) {
+                TileGrid(
+                    tiles = tiles, focusedSlot = focusedSlot, editMode = editMode, held = held, pressTick = pressTick, backdrop = false, arrival = { 1f },
+                    morph = morph, morphFrom = from, slots = BentoLayouts.AppsFolder,
+                )
+            }
         }
     }
 }
 
+/** How far the folder is from its bubble (0) to its open panel (1) at [t] of the opening (already eased) or of the closing (even, so eased here). */
+private fun folderMorph(t: Float, closing: Boolean) = if (closing) EaseInOut.transform(t) else t
+
+/** The names (of the folder and its apps) come in over the last part of the stretch, and go first when it shrinks. */
+private fun lateFade(e: Float) = ((e - 0.6f) / 0.4f).coerceIn(0f, 1f)
+
+/** The size of the bubble the panel starts as (the focused bubble's). */
+private val MorphBubble get() = IconSize * FocusedScale
+
+/** The panel's rectangle (design px, round ends) at [e]: the [bubble]'s circle at 0, stretching to the panel at 1. */
+private fun morphRect(bubble: com.minimaui.app.ui.favorites.BentoSlot, e: Float): androidx.compose.ui.geometry.Rect {
+    val cx = bubble.centerX + (FolderCenterX - bubble.centerX) * e
+    val cy = bubble.centerY + (FolderCenterY - bubble.centerY) * e
+    val w = MorphBubble + (FolderWidth - MorphBubble) * e
+    val h = MorphBubble + (FolderHeight - MorphBubble) * e
+    return androidx.compose.ui.geometry.Rect(cx - w / 2f, cy - h / 2f, cx + w / 2f, cy + h / 2f)
+}
+
 /**
- * The panel (and its contents) growing in as the folder opens ([progress] 0 to 1): from [FolderStartScale] of its size,
- * starting a little toward the [bubble] it opens from, to its full size and place, shown at [alpha] of the progress. (Growing
- * from the bubble's own size would cover the most ground in the first few frames, which shows as a jump.) [closing], it
- * shrinks back toward the bubble steadily from the first frame, over the part of the closing it is still seen in.
+ * The folder's panel at [morph]: laid out each frame at [morphRect] (no recomposition), its look going from the bubble's
+ * (glass, the icons' outline) to the panel's (a faint fill, the deep background outline).
  */
-private fun Modifier.folderGrowth(
-    bubble: com.minimaui.app.ui.favorites.BentoSlot,
-    progress: () -> Float,
-    closing: Boolean,
-    alpha: (Float) -> Float,
-): Modifier =
-    graphicsLayer {
-        val t = progress()
-        val e = if (closing) 1f - ((1f - t) / (1f - FolderPanelOut)).coerceIn(0f, 1f) else EaseInOut.transform(t)
-        this.alpha = alpha(t)
-        val s = FolderStartScale + (1f - FolderStartScale) * e
-        scaleX = s
-        scaleY = s
-        translationX = (bubble.centerX - FolderCenterX) * FolderStartDrift * (1f - e) * density
-        translationY = (bubble.centerY - FolderCenterY) * FolderStartDrift * (1f - e) * density
-        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(FolderCenterX / Dimens.DesignWidth, FolderCenterY / Dimens.DesignHeight)
+private fun Modifier.morphingPanel(bubble: com.minimaui.app.ui.favorites.BentoSlot, morph: () -> Float, ring: (Float) -> Float): Modifier = this
+    .layout { measurable, constraints ->
+        val r = morphRect(bubble, morph())
+        val placeable = measurable.measure(androidx.compose.ui.unit.Constraints.fixed(r.width.dp.roundToPx(), r.height.dp.roundToPx()))
+        layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(r.left.dp.roundToPx(), r.top.dp.roundToPx()) }
     }
+    .drawBehind {
+        val e = morph()
+        val corner = androidx.compose.ui.geometry.CornerRadius(size.height / 2f)
+        drawRoundRect(FolderPanelFill, cornerRadius = corner, alpha = e)
+        if (e < 1f) drawRoundRect(BubbleGlass, cornerRadius = corner, alpha = 1f - e)
+        // The bubble's outline fades out as it starts to stretch, and the panel's fades in as it settles (and back, closing),
+        // so no outline is seen stretching.
+        val depth = AppOutlineDepth.toPx() + (FolderOutlineDepth.toPx() - AppOutlineDepth.toPx()) * e
+        val bubbleOutline = UnfocusedOutline * FocusedOutlineGain * (1f - e / 0.25f).coerceIn(0f, 1f)
+        val panelOutline = BackgroundOutline * ((e - 0.45f) / 0.55f).coerceIn(0f, 1f)
+        drawFadingOutline(size.height / 2f, depth, maxOf(bubbleOutline, panelOutline), gain = 1f)
+        val r = ring(e)
+        if (r > 0f) drawFadingOutline(size.height / 2f, depth, r, Color.White)
+    }
+
+/**
+ * An app in an opening (or closing) folder at [morph]: from its small place in the [bubble] (as the closed folder shows it)
+ * to its [slot] of the folder's layout. In the layout's own coordinates (the folder's contents are scaled around its middle).
+ */
+private fun Modifier.slotMorph(slot: com.minimaui.app.ui.favorites.BentoSlot, bubble: com.minimaui.app.ui.favorites.BentoSlot, morph: () -> Float): Modifier = graphicsLayer {
+    val e = morph()
+    if (e >= 1f) return@graphicsLayer
+    val cx = slot.centerX
+    val cy = slot.centerY
+    // Where the bubble shows it (on screen), then in the layout's coordinates.
+    val mx = bubble.centerX + (cx - FolderCenterX) * MiniGridScaleX * FocusedScale
+    val my = bubble.centerY + (cy - PageLayoutCenterY) * MiniGridScaleY * FocusedScale
+    val qx = FolderCenterX + (mx - FolderCenterX) / FolderLayoutScale
+    val qy = PageLayoutCenterY + (my - FolderCenterY) / FolderLayoutScale
+    val s0 = MiniIconSize * FocusedScale / (IconSize * FolderLayoutScale)
+    val sc = s0 + (1f - s0) * e
+    scaleX = sc
+    scaleY = sc
+    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(cx / Dimens.DesignWidth, cy / Dimens.DesignHeight)
+    translationX = (qx - cx) * (1f - e) * density
+    translationY = (qy - cy) * (1f - e) * density
+}
+
+/** How visible the names under the icons are (the opening folder's come in late). */
+private val LocalLabelFade = androidx.compose.runtime.staticCompositionLocalOf<() -> Float> { NoFade }
+
+/**
+ * Fades the content out toward the screen's edges by [amount] (0: not at all, 1: over [EdgeFadeReach] from each edge), so
+ * the icons zooming out past them dissolve instead of being cut off. Drawn in a layer of its own only while it fades.
+ */
+private fun Modifier.edgeFade(amount: () -> Float): Modifier = this
+    .graphicsLayer {
+        compositingStrategy = if (amount() > 0f) CompositingStrategy.Offscreen else CompositingStrategy.Auto
+    }
+    .drawWithContent {
+        drawContent()
+        val a = amount()
+        if (a <= 0f) return@drawWithContent
+        val reach = EdgeFadeReach.dp.toPx() * a
+        val fx = (reach / size.width).coerceIn(0f, 0.5f)
+        val fy = (reach / size.height).coerceIn(0f, 0.5f)
+        drawRect(
+            Brush.horizontalGradient(0f to Color.Transparent, fx to Color.Black, 1f - fx to Color.Black, 1f to Color.Transparent),
+            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn
+        )
+        drawRect(
+            Brush.verticalGradient(0f to Color.Transparent, fy to Color.Black, 1f - fy to Color.Black, 1f to Color.Transparent),
+            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn
+        )
+    }
+
+private const val EdgeFadeReach = 300f
+private const val FocusBackMillis = 220
 
 /** Whether a point (design px) is on the open folder's panel. */
 private fun insideFolderPanel(x: Float, y: Float): Boolean {
@@ -408,8 +505,14 @@ private fun TileGrid(
     arrival: () -> Float,
     fadedSlot: Int = -1,
     fadedAlpha: () -> Float = { 1f },
+    morph: (() -> Float)? = null,
+    morphFrom: com.minimaui.app.ui.favorites.BentoSlot? = null,
+    slots: List<com.minimaui.app.ui.favorites.BentoSlot> = BentoLayouts.Apps,
+    focusAlpha: () -> Float = NoFade,
+    ringAlpha: () -> Float = NoFade,
 ) {
-    val slots = BentoLayouts.Apps
+    fun morphOf(i: Int): Modifier =
+        if (morph != null && morphFrom != null && i in slots.indices) Modifier.slotMorph(slots[i], morphFrom, morph) else Modifier
     // An icon that left (removed, or moved off the page) shrinks and fades where it was.
     val before = remember { arrayOf(tiles) }
     val leaving = remember(tiles) {
@@ -426,7 +529,7 @@ private fun TileGrid(
         }
         // While the screen comes in, the glow and the ring ride along with the focused icon: they fade in, rise and grow as it does.
         val glowIn = { if (focusedTile != null) cascade(arrival(), focusedSlot) else 1f }
-        val withIcon = Modifier.fillMaxSize().graphicsLayer {
+        val withIcon = Modifier.fillMaxSize().then(morphOf(focusedSlot)).graphicsLayer {
             val settled = glowIn()
             translationY = (1f - settled) * ArrivalRise.dp.toPx()
             val s = 0.9f + 0.1f * settled
@@ -439,7 +542,7 @@ private fun TileGrid(
                 )
             }
         }
-        Box(withIcon) {
+        Box(Modifier.graphicsLayer { alpha = focusAlpha() }.then(withIcon)) {
             SelectionGlow(focusRect.takeIf { focusedTile != null }, intensity = glowIn, alpha = AppGlowAlpha)
             SelectionGlow(focusRect.takeIf { focusedTile != null }, intensity = glowIn, alpha = 0.3f, inflate = 40f)
         }
@@ -447,7 +550,7 @@ private fun TileGrid(
         slots.forEachIndexed { i, s ->
             val tile = tiles.getOrNull(i)
             val focused = i == focusedSlot
-            key(tile?.key ?: "empty$i") {
+            key(tile?.key ?: "empty$i") { Box(Modifier.fillMaxSize().then(morphOf(i))) {
                 val glide = tween<Float>(durationMillis = 260, easing = EaseInOut)
                 val x by animateFloatAsState(s.x.value, glide, label = "iconX")
                 val y by animateFloatAsState(s.y.value, glide, label = "iconY")
@@ -463,7 +566,7 @@ private fun TileGrid(
                     )
                     null -> EmptySlot(x, y, editMode = editMode)
                 }
-            }
+            } }
         }
         for ((gone, index) in leaving) key(gone.id) { LeavingIcon(gone, slots[index].x.value, slots[index].y.value) }
         // The outline glides between icons and grows with the focused icon.
@@ -479,7 +582,7 @@ private fun TileGrid(
         val press = rememberPressScale(pressTick, true)
         // The same white-to-transparent, outside-in outline as the XMB covers; it also marks the focus in Edit Mode
         // and on an empty slot.
-        Box(withIcon) {
+        Box(Modifier.graphicsLayer { alpha = ringAlpha() }.then(withIcon)) {
             FocusRing(
                 focusRect, color = Color.White, intensity = glowIn, scale = { ringScale * press.value }, fadeDepth = AppOutlineDepth,
                 underStrength = if (focusedTile != null) UnfocusedOutline * FocusedOutlineGain else 0f
@@ -514,21 +617,15 @@ private const val FolderTitleY = 148f
 private const val FolderLayoutScale = 0.87f
 private const val PageLayoutCenterY = 535f // the middle row of the page's layout
 private val FolderPanelFill = Color(0x40141414)
-// Opening, the panel comes in while the page fades. Closing (the progress going down evenly), the contents fade over the first
-// part, the panel a little after them, and it is gone just as the page's icons come back, so its outline never lies over them.
-private const val FolderPanelInOpening = 0.2f
-private const val FolderContentsOut = 0.62f
-private val FolderPanelOut = FolderOpenMotion.CloseFadeEnd
 private const val FolderWarmAlpha = 0.003f
-private const val FolderStartScale = 0.75f
-private const val FolderStartDrift = 0.25f // how far toward the bubble the panel starts (a share of the way)
 
 /**
  * How the page (and the status pill, which moves the same way) gets out of the way of an opening folder, as the opening goes
- * from 0 to 1: the same step in as launching a game or an app (the screen swells by [LaunchZoom] around the bubble as it
- * fades), over the first part of the opening, about as long as a launch's.
+ * from 0 to 1: the screen swells by [Zoom] around the bubble as it fades (much more than a launch's step in, so the other
+ * icons are pushed out past the screen's edges), over the first part of the opening.
  */
 internal object FolderOpenMotion {
+    private const val Zoom = 0.35f
     const val Millis = 420
     const val FadeEnd = 0.45f
 
@@ -537,21 +634,28 @@ internal object FolderOpenMotion {
      * the progress goes down evenly over [CloseMillis], the folder shrinks and fades from the first frame, and the page comes
      * back over the last half, settling into place (decelerating) as it fades in.
      */
-    const val CloseMillis = 360
+    const val CloseMillis = 420
     const val CloseFadeEnd = 0.45f // the closing panel is gone by here
     private const val CloseBackFrom = 0.5f // the page starts coming back here (the panel is all but gone)
 
     fun spec(closing: Boolean): androidx.compose.animation.core.AnimationSpec<Float> =
         if (closing) tween(CloseMillis, easing = androidx.compose.animation.core.LinearEasing) else tween(Millis, easing = EaseInOut)
 
+    private const val OpenFadeEnd = 0.6f // opening, the page is gone by here
+    private const val OpenZoomEnd = 0.9f // and has zoomed all the way by here (the opening is already eased)
+    private const val CloseZoomFrom = 0.8f // closing, the page starts zooming back here, still unseen, so it is slower once it shows
+
     /** How far the page is out of the way (0 = in place, 1 = gone). */
     private fun away(t: Float, closing: Boolean) =
-        if (closing) 1f - ((CloseBackFrom - t) / CloseBackFrom).coerceIn(0f, 1f) else (t / FadeEnd).coerceIn(0f, 1f)
+        if (closing) 1f - ((CloseBackFrom - t) / CloseBackFrom).coerceIn(0f, 1f) else (t / OpenFadeEnd).coerceIn(0f, 1f)
 
+    /** The page's zoom, slower than its fade: it runs over nearly the whole opening, and over most of the closing. */
     fun zoom(t: Float, closing: Boolean = false): Float {
-        val a = away(t, closing)
-        val e = if (closing) 1f - androidx.compose.animation.core.LinearOutSlowInEasing.transform(1f - a) else EaseInOut.transform(a)
-        return 1f + com.minimaui.app.ui.components.LaunchZoom * e
+        val e = if (closing) {
+            val a = 1f - ((CloseZoomFrom - t) / CloseZoomFrom).coerceIn(0f, 1f)
+            1f - androidx.compose.animation.core.LinearOutSlowInEasing.transform(1f - a)
+        } else (t / OpenZoomEnd).coerceIn(0f, 1f)
+        return 1f + Zoom * e
     }
 
     /** Closing, the page shows quickly at first (so there is no empty moment after the panel), then settles in. */
@@ -563,7 +667,7 @@ internal object FolderOpenMotion {
 // The small icons in a closed folder's bubble, as the Vita packs them: the folder's layout squeezed so that neighbours in a
 // row are 62 apart and the rows 55 (diagonal neighbours 63), the middle row's ends and the corners running under the edge.
 private const val MiniIconSize = 48f
-private const val MiniGridScaleX = 62f / 367f // 367: between neighbours in a row of the page's layout
+private const val MiniGridScaleX = 62f / AppsFolderPitch // between neighbours in a row of the folder's layout
 private const val MiniGridScaleY = 55f / 263f // 263: between its rows
 // Full strength over most of the bubble, fading to 40% at its edge.
 private val MiniEdgeFade = Brush.radialGradient(
@@ -623,6 +727,7 @@ private fun AppIcon(title: String, cover: ImageBitmap?, x: Float, y: Float, inde
 /** The name under an icon or bubble; it scrolls while focused. */
 @Composable
 private fun IconLabel(text: String, x: Float, y: Float, index: Int, arrival: () -> Float, focused: Boolean, labelShift: Float) {
+    val labelFade = LocalLabelFade.current
     MarqueeText(
         text = text,
         color = TextPrimary,
@@ -634,7 +739,7 @@ private fun IconLabel(text: String, x: Float, y: Float, index: Int, arrival: () 
             .size(300.dp, 42.dp)
             .graphicsLayer {
                 val settled = cascade(arrival(), index)
-                alpha = settled
+                alpha = settled * labelFade()
                 translationY = (1f - settled) * ArrivalRise.dp.toPx()
             }
     )
@@ -691,7 +796,7 @@ private fun FolderBubble(
         ) {
         folder.apps.forEachIndexed { i, app ->
             if (app == null) return@forEachIndexed
-            val slot = BentoLayouts.Apps[i]
+            val slot = BentoLayouts.AppsFolder[i]
             val dx = (slot.centerX - FolderCenterX) * MiniGridScaleX
             val dy = (slot.centerY - PageLayoutCenterY) * MiniGridScaleY
             val cover = rememberCover(app.coverUri, MiniIconSize.toInt())
@@ -707,7 +812,7 @@ private fun FolderBubble(
         }
         }
     }
-    Box(Modifier.graphicsLayer { this.alpha = alpha() }) { IconLabel(folder.name, x, y, index, arrival, focused, labelShift) }
+    IconLabel(folder.name, x, y, index, arrival, focused, labelShift)
 }
 
 private val NoFade = { 1f }

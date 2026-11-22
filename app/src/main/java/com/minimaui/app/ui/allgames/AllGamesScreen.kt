@@ -354,9 +354,12 @@ fun AllGamesScreen(
         // The XMB wave, behind everything.
         XmbWave(style = wave, modifier = Modifier.fillMaxSize())
 
+        // How far the current list still has to glide (rows): the fade at the bottom only shows while it moves, like the
+        // Favorites page fade. Written by the current column, read only when drawing.
+        val listMotion = remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
         // One game list per platform, sliding along with its tile. Only the selected platform and its
         // neighbours exist at a time: a column fades out as it slides away from the selected position.
-        if (platforms.isNotEmpty()) Box(Modifier.fillMaxSize().fadeContent(coloredBackground) { listFadeBrush() }) {
+        if (platforms.isNotEmpty()) Box(Modifier.fillMaxSize().fadeContent(coloredBackground) { listFadeBrush(listFade(listMotion.floatValue)) }) {
             for (i in maxOf(platformIndex - 1, 0)..minOf(platformIndex + 1, platforms.lastIndex)) {
                 val platform = platforms[i]
                 key(platform.id) {
@@ -372,7 +375,8 @@ fun AllGamesScreen(
                         pressTick = pressTick,
                         heldAmount = heldAmount,
                         backdrop = ribbon,
-                        editMode = editMode
+                        editMode = editMode,
+                        motion = listMotion
                     )
                 }
             }
@@ -398,12 +402,15 @@ fun AllGamesScreen(
             }
         }
 
-        // The list fades to black at the bottom of the screen, where the third cover runs off it.
+        // While the list moves, it fades to black over the gap between the lowest cover and the bottom of the screen.
         if (!coloredBackground) Box(
             modifier = Modifier
                 .offset(0.dp, ListFadeTop.dp)
                 .size(Dimens.DesignWidth.dp, (Dimens.DesignHeight - ListFadeTop).dp)
-                .background(Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black))
+                .drawBehind {
+                    val amount = listFade(listMotion.floatValue)
+                    if (amount > 0f) drawRect(Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black.copy(alpha = amount)))
+                }
         )
 
         // The Edit Mode label comes into focus when the mode starts and blurs away when it ends.
@@ -635,10 +642,13 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.rowDimBrush(): Pair
         androidx.compose.ui.geometry.Rect(0f, top, size.width, top + (2 * RowDimHalfHeight).dp.toPx())
 }
 
-/** The list's fade at the bottom of the screen as an alpha mask, in px, for [fadeContent]. */
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.listFadeBrush(): Pair<Brush, androidx.compose.ui.geometry.Rect> {
+/** How strongly the bottom fade shows while the list still has [motion] rows to glide: none at rest, full a fifth of a row out. */
+private fun listFade(motion: Float): Float = (motion * 5f).coerceIn(0f, 1f)
+
+/** The list's fade at the bottom of the screen ([amount] of it) as an alpha mask, in px, for [fadeContent]. */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.listFadeBrush(amount: Float): Pair<Brush, androidx.compose.ui.geometry.Rect> {
     val top = ListFadeTop.dp.toPx()
-    return Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black, startY = top, endY = size.height) to
+    return Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black.copy(alpha = amount), startY = top, endY = size.height) to
         androidx.compose.ui.geometry.Rect(0f, top, size.width, size.height)
 }
 
@@ -655,9 +665,10 @@ private fun Modifier.fadeContent(on: Boolean, mask: androidx.compose.ui.graphics
             drawRect(brush, topLeft = rect.topLeft, size = rect.size, blendMode = BlendMode.DstOut)
         }
 
-private const val ListFadeTop = 1000f
+// The fade under the list covers only the gap between the lowest cover (two rows below the focus) and the screen's bottom.
+private val ListFadeTop by lazy { SlotCenterY[FocusSlot + 2] + CoverWidth * SlotScale[FocusSlot + 2] * CoverAspect / 2f }
 private const val JumpRows = 3f // a jump of more rows than this swipes in from this many rows away
-private const val JumpFadeLow = 0.25f // the fade to black under the list starts here and is solid at the screen's bottom
+private const val JumpFadeLow = 0.25f
 private const val CoverDecodePx = 340
 
 // The cover's outline is white at the very edge and fades to nothing this far (at full size) toward the inside.
@@ -779,6 +790,7 @@ private fun GameColumn(
     heldAmount: State<Float>,
     backdrop: Boolean,
     editMode: Boolean,
+    motion: androidx.compose.runtime.MutableFloatState,
 ) {
     val press = rememberPressScale(pressTick, isCurrent)
     // The covers a scroll is about to bring in are decoded ahead (the current platform: a window around the selection, the others: the
@@ -810,6 +822,12 @@ private fun GameColumn(
         }
     }
     val listPosition = glide.asState()
+    // The current list tells the screen how far it still has to glide (for the fade at the bottom).
+    if (isCurrent) {
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            androidx.compose.runtime.snapshotFlow { abs(glide.value - glide.targetValue) }.collect { motion.floatValue = it }
+        }
+    }
     // 1 when this column's platform is the selected one, fading to 0 a full step away.
     val columnAlpha = { (1f - abs(index - platformPosition.value)).coerceIn(0f, 1f) }
     val rows = games.size + if (showPlus) 1 else 0

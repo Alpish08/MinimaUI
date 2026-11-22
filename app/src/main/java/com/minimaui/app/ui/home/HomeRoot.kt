@@ -137,6 +137,12 @@ fun HomeRoot(
     modifier: Modifier = Modifier,
 ) {
     val state = remember(library, appLibrary, settings) { HomeState(library, appLibrary, settings, actions) }
+    // The launcher menu grows out of its tile (see FavoritesMoreMenu) and shrinks back into it; the tile is hidden meanwhile.
+    val moreMorph = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(state.moreOpen) {
+        moreMorph.animateTo(if (state.moreOpen) 1f else 0f, tween(if (state.moreOpen) MoreOpenMillis else MoreCloseMillis, easing = EaseInOut))
+    }
+    val moreShown by remember { derivedStateOf { moreMorph.value > 0f } }
     val focusRequester = remember { FocusRequester() }
     // The boot sequence (logo centred, then gliding down to Favorites); 1 = finished or skipped.
     val boot = remember { Animatable(if (playBoot) 0f else 1f) }
@@ -430,6 +436,7 @@ fun HomeRoot(
                         val keyboardBefore = (state.searchOpen && !state.searchOnResults) || state.ownKeyboardEntry
                         val onShiftBefore = state.keyboardOnShift
                         val screenBefore = state.screen
+                        val folderBefore = state.appsNav.openFolderId != null
                         val idleBack = (event.key == Key.ButtonB || event.key == Key.Back || event.key == Key.Escape) && !state.canStepBack()
                         val handled = state.onKey(event.key, isRepeat = event.nativeKeyEvent.repeatCount > 0)
                         val isDirection = event.key == Key.DirectionUp || event.key == Key.DirectionDown ||
@@ -456,8 +463,9 @@ fun HomeRoot(
                                 // Opening the launcher menu; leaving it with B is silent (choosing an entry plays its own sound).
                                 !moreBefore && state.moreOpen -> uiSounds.play(Sfx.Menu)
                                 // Choosing an entry of the launcher menu: the confirm sound (the random game has its own launch sound).
+                                // (Random Game, Edit Mode, Gallery and Music make their own: a launch or the Edit Mode sound.)
                                 moreBefore && (event.key == Key.ButtonA || event.key == Key.Enter || event.key == Key.DirectionCenter) ->
-                                    if (state.moreIndex != 2) uiSounds.play(Sfx.CancelConfirm)
+                                    if (state.moreIndex != 2 && state.moreIndex < 6) uiSounds.play(Sfx.CancelConfirm)
                                 moreBefore && !state.moreOpen && (event.key == Key.ButtonB || event.key == Key.Back || event.key == Key.Escape) -> Unit
                                 // Opening the settings menu or switching between Favorites / All Games / Apps; closing the menu is silent.
                                 state.menuOpen && !menuBefore || state.screen != screenBefore -> uiSounds.play(Sfx.MenuNavigate)
@@ -465,6 +473,8 @@ fun HomeRoot(
                                 // Page changes play their own sound (so the right stick and touch swipes get it too); at the last or first page it is the edge sound.
                                 event.key == Key.ButtonL1 || event.key == Key.ButtonR1 ->
                                     if (EdgeSoundOn && state.cursorSignature == before && event.nativeKeyEvent.repeatCount == 0) uiSounds.play(Sfx.Edge)
+                                // Opening an Apps folder plays its own sound (the confirm, from the state, so a tap gets it too); closing it is silent.
+                                state.screen == HomeScreen.Apps && folderBefore != (state.appsNav.openFolderId != null) -> Unit
                                 // A on the home screens launches something, which has its own sound.
                                 (event.key == Key.ButtonA || event.key == Key.Enter || event.key == Key.DirectionCenter) && !overlay -> Unit
                                 // Enter on an item of a menu.
@@ -578,7 +588,7 @@ fun HomeRoot(
                             pressTick = state.pressTick,
                             logoAlpha = boot.value,
                             onTap = state::tapFavorite,
-                        onLongPress = { state.touchLongPress(HomeScreen.Favorites) },
+                            launcherAway = state.moreOpen || moreShown,
                             onSwipe = state::swipeFavoritesPage,
                             onEditHold = { state.touchEditHold(HomeScreen.Favorites, it) },
                             onEditDrag = { state.touchEditDrag(HomeScreen.Favorites, it) },
@@ -797,19 +807,15 @@ fun HomeRoot(
             }
         }
 
-        AnimatedVisibility(
-            visible = state.moreOpen,
-            enter = fadeIn(tween(160)),
-            exit = fadeOut(tween(120))
-        ) {
-            OverlayMotion(scrim = true) {
-                FavoritesMoreMenu(
-                    selected = state.moreIndex,
-                    hints = state.moreHints,
-                    onTapSlot = state::tapMore,
-                    onTapOutside = { state.back() }
-                )
-            }
+        if (state.moreOpen || moreShown) {
+            FavoritesMoreMenu(
+                selected = state.moreIndex,
+                focusShown = !state.moreTouch,
+                hints = state.moreHints,
+                progress = { moreMorph.value },
+                onTapSlot = state::tapMore,
+                onTapOutside = { state.back() }
+            )
         }
 
         AnimatedVisibility(
@@ -971,3 +977,6 @@ private fun DockWave(config: com.minimaui.app.model.WaveConfig, look: com.minima
         }
     }
 }
+
+private const val MoreOpenMillis = 380
+private const val MoreCloseMillis = 320

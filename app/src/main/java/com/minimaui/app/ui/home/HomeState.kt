@@ -302,6 +302,9 @@ class HomeState(
         private set
     var moreIndex by mutableIntStateOf(0)
         private set
+    /** The menu was opened by touch: its focus is kept but not shown until a key is pressed. */
+    var moreTouch by mutableStateOf(false)
+        private set
     var folderPickerOpen by mutableStateOf(false)
         private set
     var folderIndex by mutableIntStateOf(0)
@@ -383,13 +386,16 @@ class HomeState(
             else -> listOf(ControlHint("A", "New Folder"), ControlHint("B", "Back"))
         }
 
-    fun openMore() {
+    fun openMore(touch: Boolean = false) {
         if (!hasLauncher || editMode || menuOpen || pickerOpen || searchOpen || detailsGame != null || isEditingTitle) return
         moreIndex = 0
+        moreTouch = touch
         moreOpen = true
     }
 
     private fun onMoreKey(key: Key, isRepeat: Boolean): Boolean {
+        // Any key but B (which closes the menu) shows the focus.
+        if (key != Key.ButtonB && key != Key.Escape) moreTouch = false
         when (key) {
             Key.DirectionLeft -> if (moreIndex % MoreMenuColumns > 0) moreIndex--
             Key.DirectionRight -> if (moreIndex % MoreMenuColumns < MoreMenuColumns - 1 && moreIndex < MoreMenuEntries - 1) moreIndex++
@@ -404,7 +410,7 @@ class HomeState(
 
     /** A tap on a launcher menu entry (the random game has its own launch sound). */
     fun tapMore(index: Int) {
-        if (index != 2) confirmSound()
+        if (index != 2 && index < 6) confirmSound() // the others make their own (launch, Edit Mode)
         chooseMore(index)
     }
 
@@ -441,6 +447,19 @@ class HomeState(
             5 -> {
                 moreOpen = false
                 openSearch()
+            }
+            6 -> {
+                moreOpen = false
+                changeEditMode(true)
+            }
+            // Until MinimaUI has its own media app: Aves for pictures, Auxio for music.
+            7 -> {
+                moreOpen = false
+                actions.launchApp(AppEntry(GalleryPackage, "Aves"))
+            }
+            8 -> {
+                moreOpen = false
+                actions.launchApp(AppEntry(MusicPackage, "Auxio"))
             }
         }
     }
@@ -622,7 +641,7 @@ class HomeState(
         override fun press() { pressTick++ }
         override fun haptic() = this@HomeState.haptic()
         override fun pageSound() = this@HomeState.pageSound()
-        override fun openSound() = this@HomeState.pageSound()
+        override fun openSound() = this@HomeState.confirmSound()
     })
 
     /** Bumped whenever A confirms a tile, so the focused one can play its pressed feel. */
@@ -1500,7 +1519,7 @@ class HomeState(
         val flat = favoritesNav.page * FavoritesPageSize + slot
         if (hasLauncher && flat == LauncherFlat) {
             favoritesNav.focusAt(flat)
-            openMore()
+            openMore(touch = true)
             menuSound()
             return
         }
@@ -2339,3 +2358,6 @@ class HomeState(
 
 /** How far one press moves a slider of the wave's Customize screen, in %. */
 private const val WaveSliderStep = 2
+
+private const val GalleryPackage = "deckers.thibault.aves"
+private const val MusicPackage = "org.oxycblt.auxio"

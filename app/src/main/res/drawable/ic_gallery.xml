@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A picture (Gallery): a solid, wide rounded frame with the sun and two rounded mountains cut out of it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M4.5,3.5 L19.5,3.5 A3.5,3.5 0 0 1 23,7 L23,17 A3.5,3.5 0 0 1 19.5,20.5 L4.5,20.5 A3.5,3.5 0 0 1 1,17 L1,7 A3.5,3.5 0 0 1 4.5,3.5 Z M7.3,6.6 a2.1,2.1 0 1 0 0.01,0 Z M5.2,17.6 Q4.4,17.6 4.9,16.9 L7.9,13.0 Q8.6,12.2 9.3,13.0 L11.1,15.0 L13.9,11.1 Q14.6,10.2 15.3,11.1 L19.1,16.9 Q19.6,17.6 18.8,17.6 Z" />
+</vector>

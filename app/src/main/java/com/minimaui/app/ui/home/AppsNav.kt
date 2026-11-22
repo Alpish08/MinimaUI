@@ -27,6 +27,7 @@ interface AppsNavActions {
     fun press()
     fun haptic()
     fun pageSound()
+    /** Opening a folder (by key or touch): the confirm sound. Closing it is silent. */
     fun openSound()
 }
 

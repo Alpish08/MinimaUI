@@ -11,8 +11,8 @@ android {
         applicationId = "com.minimaui.app"
         minSdk = 33
         targetSdk = 37
-        versionCode = 24
-        versionName = "3.1"
+        versionCode = 25
+        versionName = "3.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

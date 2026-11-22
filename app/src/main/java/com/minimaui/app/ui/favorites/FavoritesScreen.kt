@@ -93,13 +93,14 @@ fun BentoScreen(
     pressTick: Int = 0,
     logoAlpha: Float = 1f,
     onTap: (slot: Int) -> Unit = {},
-    onLongPress: () -> Unit = {},
     onSwipe: (delta: Int) -> Unit = {},
     onEditHold: (slot: Int) -> Unit = {},
     onEditDrag: (slot: Int) -> Unit = {},
     onEditEdge: (delta: Int) -> Unit = {},
     onEditRelease: () -> Unit = {},
     showLauncher: Boolean = false,
+    // The launcher menu is out (it grew out of the tile, so the tile isn't shown at the same time).
+    launcherAway: Boolean = false,
     viewLabel: String? = null,
     viewIcon: Int? = null,
     // Drawn inside the dock, under everything on it (the frosted custom wave); the dock's fill lets it show through.
@@ -114,8 +115,8 @@ fun BentoScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            // Touch: tap a tile to launch it, swipe left/right to change page (the owner ignores both in Edit Mode); outside
-            // Edit Mode, holding a game's tile turns Edit Mode on.
+            // Touch: tap a tile to launch it, swipe left/right to change page (the owner ignores both in Edit Mode). Edit Mode
+            // is turned on from the launcher tile's menu (the pen), not by holding a tile.
             .pointerInput(page, editMode) {
                 fun tileAt(offset: Offset): Int {
                     val x = offset.x / density - Dimens.PanelX.value
@@ -124,11 +125,7 @@ fun BentoScreen(
                         x >= s.x.value && x <= s.x.value + s.width.value && y >= s.y.value && y <= s.y.value + s.height.value
                     }
                 }
-                detectTapGestures(
-                    onLongPress = if (editMode) null else { offset ->
-                        if (entriesFor(page).getOrNull(tileAt(offset)) != null) onLongPress()
-                    },
-                ) { offset ->
+                detectTapGestures { offset ->
                     val entries = entriesFor(page)
                     tileAt(offset).takeIf { it >= 0 && (entries.getOrNull(it) != null || (showLauncher && page == 0 && it == LauncherSlot)) }?.let(onTap)
                 }
@@ -216,7 +213,7 @@ fun BentoScreen(
                     editMode = editMode,
                     held = held,
                     pressTick = pressTick,
-                    launcher = showLauncher && pageIndex == 0,
+                    launcher = showLauncher && pageIndex == 0 && !launcherAway,
                     dimLauncher = editMode
                 )
             }
